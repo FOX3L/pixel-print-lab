@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.8.1] - 2026-09-01
+
+### Fixed
+
+- Aggiornato il namespace GitHub Container Registry dopo il trasferimento del repository a FOX3L.
+
 ## [1.8.0] - 2026-09-01
 
 ### Changed

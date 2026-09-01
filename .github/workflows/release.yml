@@ -10,7 +10,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ghcr.io/bravepix3l/pixel-print-lab
+  IMAGE_NAME: ghcr.io/fox3l/pixel-print-lab
 
 jobs:
   verify:
