@@ -1,7 +1,7 @@
 import { state } from "./state.js";
 import { euroFormatter, formatDate, formatQuoteSummary, orderStatusLabels } from "./format.js";
 
-export function initOrders({ api }) {
+export function initOrders({ api, loadPix }) {
   const orderCount = document.querySelector("#order-count");
   const orderListStatus = document.querySelector("#order-list-status");
   const orderList = document.querySelector("#order-list");
@@ -30,6 +30,7 @@ export function initOrders({ api }) {
   const archiveCount = document.querySelector("#archive-count");
   const catalogView = document.querySelector("#catalog-view");
   const paletteView = document.querySelector("#palette-view");
+  const pixView = document.querySelector("#pix-view");
   const navigationButtons = document.querySelectorAll("[data-view]");
 
   function renderOrderList() {
@@ -229,9 +230,11 @@ export function initOrders({ api }) {
     ordersView.hidden = name !== "orders" && name !== "archive";
     catalogView.hidden = name !== "catalog";
     paletteView.hidden = name !== "palette";
+    pixView.hidden = name !== "pix";
     orderSidebar.hidden = name !== "orders";
     archiveSidebar.hidden = name !== "archive";
     if (name === "archive" && state.archive.length === 0) loadArchive();
+    if (name === "pix") loadPix();
     navigationButtons.forEach((button) => {
       const active = button.dataset.view === name;
       button.classList.toggle("admin-nav__button--active", active);

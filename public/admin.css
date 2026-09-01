@@ -185,6 +185,7 @@
 .admin-nav {
   margin-top: 0.65rem;
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 0.4rem;
 }
@@ -1101,6 +1102,159 @@
   font-family: "Dogica Bold", "Dogica", monospace;
 }
 
+.pix-workspace {
+  width: min(100%, 92rem);
+  min-height: calc(100vh - 7rem);
+  margin: 0 auto;
+  padding: clamp(1.25rem, 4vw, 3rem);
+  display: grid;
+  align-content: start;
+  gap: 2rem;
+  background-image: linear-gradient(rgba(23, 32, 26, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(23, 32, 26, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.pix-hero {
+  padding: clamp(1.25rem, 3vw, 2rem);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(1rem, 3vw, 2rem);
+  color: var(--paper);
+  background: var(--ink);
+  box-shadow: 10px 10px 0 var(--orange);
+}
+
+.pix-hero > img {
+  width: clamp(5rem, 10vw, 8rem);
+  image-rendering: pixelated;
+}
+
+.pix-hero h2,
+.pix-profiles h3 {
+  margin: 0.35rem 0;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: clamp(2rem, 5vw, 4rem);
+  letter-spacing: -0.06em;
+}
+
+.pix-hero p:last-child {
+  max-width: 44rem;
+  margin: 0;
+  color: #c7cec9;
+  line-height: 1.5;
+}
+
+.pix-hero dl {
+  margin: 0;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.pix-hero dl div {
+  min-width: 7.5rem;
+  padding: 0.85rem;
+  color: var(--ink);
+  background: var(--paper);
+  border: 3px solid var(--orange);
+}
+
+.pix-hero dt,
+.pix-profile-card__balance span {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pix-hero dd {
+  margin: 0.4rem 0 0;
+  color: var(--blue);
+  font-family: "Dogica Bold", "Dogica", monospace;
+  font-size: 1.25rem;
+}
+
+.pix-profiles {
+  padding: clamp(1rem, 3vw, 2rem);
+  background: var(--panel);
+  border: var(--line);
+}
+
+.pix-profiles__heading {
+  padding-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: var(--line);
+}
+
+.pix-profiles h3 {
+  font-size: clamp(1.7rem, 4vw, 2.75rem);
+}
+
+.pix-profiles__heading button {
+  padding: 0.7rem 1rem;
+  color: var(--paper);
+  background: var(--blue);
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--orange);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.pix-profile-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.pix-profile-card {
+  padding: 0.85rem;
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  box-shadow: 5px 5px 0 var(--blue);
+}
+
+.pix-profile-card > img {
+  width: 3.5rem;
+  image-rendering: pixelated;
+}
+
+.pix-profile-card__identity {
+  min-width: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.pix-profile-card__identity strong,
+.pix-profile-card__identity span {
+  overflow-wrap: anywhere;
+}
+
+.pix-profile-card__identity span {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.pix-profile-card__balance {
+  min-width: 4rem;
+  display: grid;
+  justify-items: end;
+  gap: 0.25rem;
+}
+
+.pix-profile-card__balance strong {
+  color: var(--orange);
+  font-family: "Dogica Bold", "Dogica", monospace;
+  font-size: 1.35rem;
+}
+
 @media (max-width: 900px) {
   .admin-header {
     grid-template-columns: auto 1fr auto;
@@ -1121,6 +1275,14 @@
 
   .catalog-workspace {
     grid-template-columns: 1fr;
+  }
+
+  .pix-hero {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .pix-hero dl {
+    grid-column: 1 / -1;
   }
 
   .order-sidebar {
@@ -1178,6 +1340,40 @@
   .order-editor,
   .catalog-main {
     padding: 1rem;
+  }
+
+  .pix-workspace {
+    min-height: calc(100vh - 5rem);
+    padding: 1rem;
+  }
+
+  .pix-hero {
+    grid-template-columns: 4rem minmax(0, 1fr);
+  }
+
+  .pix-hero > img {
+    width: 4rem;
+  }
+
+  .pix-hero dl {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .pix-hero dl div {
+    min-width: 0;
+  }
+
+  .pix-profile-list {
+    grid-template-columns: 1fr;
+  }
+
+  .pix-profile-card {
+    grid-template-columns: 3rem minmax(0, 1fr) auto;
+  }
+
+  .pix-profile-card > img {
+    width: 3rem;
   }
 
   .order-list {

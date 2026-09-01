@@ -274,8 +274,31 @@ export function registerAdminRoutes(
   const updateOrderStatus = database.prepare(`
     UPDATE orders SET status = ? WHERE id = ?
   `);
+  const markOrderPixAwarded = database.prepare(`
+    UPDATE orders
+    SET pix_awarded_at = CURRENT_TIMESTAMP
+    WHERE id = @orderId AND pix_awarded_at IS NULL
+      AND user_account_id IN (
+        SELECT id FROM user_accounts WHERE role = 'customer'
+      )
+  `);
+  const awardAccountPix = database.prepare(`
+    UPDATE user_accounts
+    SET pix_balance = pix_balance + 1, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND role = 'customer'
+  `);
+  const updateOrderStatusAndAwardPix = database.transaction((order, status) => {
+    updateOrderStatus.run(status, order.id);
+    if (status !== "consegnato" || order.pix_awarded_at || !order.user_account_id) return false;
+    if (!markOrderPixAwarded.run({ orderId: order.id }).changes) return false;
+    if (!awardAccountPix.run(order.user_account_id).changes) {
+      throw new Error("Impossibile assegnare il Pix al profilo.");
+    }
+    return true;
+  });
   const findOrderStatusNotification = database.prepare(`
-    SELECT orders.id, orders.code, orders.status, user_accounts.email AS account_email,
+    SELECT orders.id, orders.code, orders.status, orders.user_account_id, orders.pix_awarded_at,
+      user_accounts.email AS account_email,
       user_accounts.email_verified_at AS account_email_verified_at,
       user_accounts.email_notifications_enabled AS account_email_notifications_enabled
     FROM orders
@@ -396,6 +419,27 @@ export function registerAdminRoutes(
         products: await Promise.all(listAdminProducts.all().map((product) => serializeAdminProduct(product, catalogDirectory))),
         colors: listAdminColors.all().map(serializeAdminColor),
       },
+    });
+  });
+
+  app.get("/api/admin/pix", requireAdmin, (_request, response) => {
+    const profiles = database.prepare(`
+      SELECT id, first_name, last_name, email, pix_balance, created_at
+      FROM user_accounts
+      WHERE role = 'customer' AND auth_source = 'local'
+      ORDER BY pix_balance DESC, last_name COLLATE NOCASE, first_name COLLATE NOCASE, id
+    `).all().map((account) => ({
+      id: account.id,
+      firstName: account.first_name,
+      lastName: account.last_name,
+      email: account.email,
+      pixBalance: account.pix_balance,
+      createdAt: account.created_at,
+    }));
+    response.json({
+      data: profiles,
+      count: profiles.length,
+      totalPix: profiles.reduce((total, profile) => total + profile.pixBalance, 0),
     });
   });
 
@@ -568,7 +612,7 @@ export function registerAdminRoutes(
       if (!order) {
         throw new AdminError("ORDER_NOT_FOUND", "Richiesta non trovata.", 404);
       }
-      updateOrderStatus.run(request.body.status, id);
+      const pixAwarded = updateOrderStatusAndAwardPix(order, request.body.status);
       if (
         order.status !== "in_lavorazione" &&
         request.body.status === "in_lavorazione" &&
@@ -591,7 +635,7 @@ export function registerAdminRoutes(
           console.error(`Notifica cliente non inviata per ${order.code}.`, error);
         }
       }
-      return response.json({ data: { id, status: request.body.status } });
+      return response.json({ data: { id, status: request.body.status, pixAwarded } });
     } catch (error) {
       return sendError(response, error);
     }

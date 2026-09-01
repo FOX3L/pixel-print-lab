@@ -463,6 +463,34 @@ const migrations = [
       );
     `,
   },
+  {
+    version: 24,
+    name: "add_account_pix",
+    sql: `
+      ALTER TABLE user_accounts
+      ADD COLUMN pix_balance INTEGER NOT NULL DEFAULT 0
+      CHECK (pix_balance >= 0);
+
+      ALTER TABLE orders
+      ADD COLUMN pix_awarded_at TEXT;
+
+      UPDATE user_accounts
+      SET pix_balance = (
+        SELECT COUNT(*)
+        FROM orders
+        WHERE orders.user_account_id = user_accounts.id
+          AND orders.status = 'consegnato'
+      )
+      WHERE role = 'customer';
+
+      UPDATE orders
+      SET pix_awarded_at = COALESCE(created_at, CURRENT_TIMESTAMP)
+      WHERE status = 'consegnato'
+        AND user_account_id IN (
+          SELECT id FROM user_accounts WHERE role = 'customer'
+        );
+    `,
+  },
 ];
 
 const products = [

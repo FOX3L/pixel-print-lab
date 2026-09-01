@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.12.0] - 2026-09-02
+
+### Added
+
+- Sistema Pix che assegna una moneta al profilo cliente quando un suo ordine viene consegnato per la prima volta.
+- Saldo Pix nel profilo cliente e nuova schermata Control Room con elenco profili, saldi e totale complessivo.
+- Accredito atomico e idempotente, senza premi per ordini ospite o account amministrativi.
+
+### Migration notes
+
+- La migrazione database `24` aggiunge saldo e tracciamento degli accrediti, conteggiando anche gli ordini cliente gia consegnati.
+
 ## [1.11.0] - 2026-09-02
 
 ### Added

@@ -775,6 +775,42 @@
   accent-color: var(--orange);
 }
 
+.account-pix {
+  width: fit-content;
+  margin-top: 1rem;
+  padding: 0.55rem 0.8rem 0.55rem 0.55rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--orange);
+}
+
+.account-pix img {
+  width: 3rem;
+  height: 3rem;
+  image-rendering: pixelated;
+}
+
+.account-pix div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.account-pix span {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.account-pix strong {
+  color: var(--blue);
+  font-family: "Dogica Bold", "Dogica", monospace;
+  font-size: 1.25rem;
+}
+
 .account-profile__actions {
   display: flex;
   gap: 0.75rem;

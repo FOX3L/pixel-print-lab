@@ -209,6 +209,8 @@ test("serve la pagina pubblica con un catalogo accessibile", async () => {
   assert.match(page, /id="account-password-reset-form"/);
   assert.match(page, /id="account-delete-open"/);
   assert.match(page, /id="account-delete-form"/);
+  assert.match(page, /id="account-pix-balance"/);
+  assert.match(page, /src="\/brand\/PIX\.svg"/);
   assert.match(page, /id="confirmation-code"/);
   assert.match(page, /type="importmap"/);
   assert.match(page, /<script type="module" src="\/app.js(\?v=[^"]+)?"><\/script>/);
@@ -226,6 +228,8 @@ test("serve gli asset pubblici", async () => {
     "/admin.html",
     "/admin.css",
     "/admin.js",
+    "/brand/PIX.svg",
+    "/js/admin/pix.js",
   ];
   const responses = await Promise.all(paths.map((path) => fetch(`${baseUrl}${path}`)));
 
@@ -248,6 +252,9 @@ test("mostra i dettagli amministrativi dell'ordine in sola lettura", async () =>
   assert.match(page, /id="email-notifications-enabled"/);
   assert.match(page, /id="admin-email" name="email" type="email"/);
   assert.match(page, /id="credentials-email" name="email" type="email"/);
+  assert.match(page, /data-view="pix"/);
+  assert.match(page, /id="pix-view"/);
+  assert.match(page, /id="pix-profile-template"/);
 });
 
 test("riconosce e usa una configurazione SMTP completa", async () => {
@@ -357,8 +364,10 @@ test("il seed puo essere eseguito piu volte senza duplicare dati", () => {
 
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM products").get().count, 2);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM colors").get().count, 4);
-  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 23);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 24);
   assert.ok(database.prepare("SELECT email_verified_at FROM user_accounts LIMIT 1"));
+  assert.ok(database.prepare("SELECT pix_balance FROM user_accounts LIMIT 1"));
+  assert.ok(database.prepare("SELECT pix_awarded_at FROM orders LIMIT 1"));
   assert.equal(database.prepare("SELECT email_notifications_enabled FROM app_settings WHERE id = 1").get().email_notifications_enabled, 0);
 });
 
@@ -421,7 +430,7 @@ test("migra un catalogo esistente senza perdere dati e impedisce il riuso degli 
     assert.equal(legacyDatabase.prepare("SELECT model_format FROM order_items WHERE id = 1").get().model_format, "stl");
     assert.equal(legacyDatabase.prepare("SELECT status FROM orders WHERE id = 1").get().status, "in_attesa");
     assert.equal(legacyDatabase.prepare("SELECT comment FROM orders WHERE id = 1").get().comment, null);
-    assert.equal(legacyDatabase.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 23);
+    assert.equal(legacyDatabase.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 24);
     assert.equal(legacyDatabase.prepare("SELECT COUNT(*) AS count FROM email_verification_tokens").get().count, 0);
     assert.equal(legacyDatabase.prepare("SELECT email_notifications_enabled FROM app_settings WHERE id = 1").get().email_notifications_enabled, 0);
     assert.equal(legacyDatabase.prepare("SELECT admin_username FROM app_settings WHERE id = 1").get().admin_username, null);
@@ -433,6 +442,56 @@ test("migra un catalogo esistente senza perdere dati e impedisce il riuso degli 
     assert.ok(nextId > 7);
   } finally {
     legacyDatabase.close();
+  }
+});
+
+test("assegna i Pix agli ordini cliente gia consegnati durante la migrazione", () => {
+  const previousDatabase = new Database(":memory:");
+  try {
+    previousDatabase.exec(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE user_accounts (
+        id INTEGER PRIMARY KEY,
+        role TEXT NOT NULL,
+        first_name TEXT NOT NULL,
+        last_name TEXT NOT NULL
+      );
+      CREATE TABLE orders (
+        id INTEGER PRIMARY KEY,
+        status TEXT NOT NULL,
+        user_account_id INTEGER,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO user_accounts (id, role, first_name, last_name) VALUES
+        (1, 'customer', 'Cliente', 'Storico'),
+        (2, 'admin', 'Admin', 'Storico');
+      INSERT INTO orders (id, status, user_account_id) VALUES
+        (1, 'consegnato', 1),
+        (2, 'consegnato', 2),
+        (3, 'consegnato', NULL),
+        (4, 'in_lavorazione', 1);
+    `);
+    const recordMigration = previousDatabase.prepare(
+      "INSERT INTO schema_migrations (version, name) VALUES (?, ?)",
+    );
+    for (let version = 1; version <= 23; version += 1) {
+      recordMigration.run(version, `previous_${version}`);
+    }
+
+    migrateDatabase(previousDatabase);
+
+    assert.equal(previousDatabase.prepare("SELECT pix_balance FROM user_accounts WHERE id = 1").get().pix_balance, 1);
+    assert.equal(previousDatabase.prepare("SELECT pix_balance FROM user_accounts WHERE id = 2").get().pix_balance, 0);
+    assert.ok(previousDatabase.prepare("SELECT pix_awarded_at FROM orders WHERE id = 1").get().pix_awarded_at);
+    assert.equal(previousDatabase.prepare("SELECT pix_awarded_at FROM orders WHERE id = 2").get().pix_awarded_at, null);
+    assert.equal(previousDatabase.prepare("SELECT pix_awarded_at FROM orders WHERE id = 3").get().pix_awarded_at, null);
+    assert.equal(previousDatabase.prepare("SELECT pix_awarded_at FROM orders WHERE id = 4").get().pix_awarded_at, null);
+  } finally {
+    previousDatabase.close();
   }
 });
 
@@ -1111,6 +1170,8 @@ test("archivia gli ordini consegnati e li esclude dalla homepage", async () => {
     body: JSON.stringify({ status: "consegnato" }),
   });
   assert.equal(statusResponse.status, 200);
+  assert.equal((await statusResponse.json()).data.pixAwarded, false);
+  assert.equal(database.prepare("SELECT pix_awarded_at FROM orders WHERE id = ?").get(order.id).pix_awarded_at, null);
 
   const publicOrders = (await (await fetch(`${baseUrl}/api/orders`)).json()).data;
   assert.equal(publicOrders.some((o) => o.code === code), false);
@@ -1541,6 +1602,7 @@ test("gestisce account, storico personale e accesso amministrativo unificato", a
   assert.equal(sessionAccount.username, "cliente@example.test");
   assert.equal(sessionAccount.email, "cliente@example.test");
   assert.equal(sessionAccount.emailVerified, false);
+  assert.equal(sessionAccount.pixBalance, 0);
   assert.equal((await accountFetch("/api/admin/session")).status, 403);
 
   const orderResponse = await accountFetch("/api/orders", {
@@ -1605,6 +1667,38 @@ test("gestisce account, storico personale e accesso amministrativo unificato", a
   assert.equal(estimatedCustom.items[0].estimatedQuote.unitPriceCents, 500);
 
   const adminCookieForQuote = await authenticateAdmin();
+  const firstDelivery = await fetch(`${baseUrl}/api/admin/orders/${savedOrder.id}/status`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", cookie: adminCookieForQuote },
+    body: JSON.stringify({ status: "consegnato" }),
+  });
+  assert.equal(firstDelivery.status, 200);
+  assert.equal((await firstDelivery.json()).data.pixAwarded, true);
+  assert.equal(database.prepare("SELECT pix_balance FROM user_accounts WHERE id = ?").get(registeredAccount.data.id).pix_balance, 1);
+  assert.ok(database.prepare("SELECT pix_awarded_at FROM orders WHERE id = ?").get(savedOrder.id).pix_awarded_at);
+
+  const pixProfilesResponse = await fetch(`${baseUrl}/api/admin/pix`, {
+    headers: { cookie: adminCookieForQuote },
+  });
+  const pixProfiles = await pixProfilesResponse.json();
+  assert.equal(pixProfilesResponse.status, 200);
+  assert.equal(pixProfiles.data.find((profile) => profile.id === registeredAccount.data.id).pixBalance, 1);
+  assert.equal(pixProfiles.totalPix, 1);
+  assert.equal((await (await accountFetch("/api/account/session")).json()).data.pixBalance, 1);
+
+  await fetch(`${baseUrl}/api/admin/orders/${savedOrder.id}/status`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", cookie: adminCookieForQuote },
+    body: JSON.stringify({ status: "completato" }),
+  });
+  const repeatedDelivery = await fetch(`${baseUrl}/api/admin/orders/${savedOrder.id}/status`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", cookie: adminCookieForQuote },
+    body: JSON.stringify({ status: "consegnato" }),
+  });
+  assert.equal((await repeatedDelivery.json()).data.pixAwarded, false);
+  assert.equal(database.prepare("SELECT pix_balance FROM user_accounts WHERE id = ?").get(registeredAccount.data.id).pix_balance, 1);
+
   const notificationCountBeforeVerification = sentEmails.length;
   const unverifiedInProgressResponse = await fetch(`${baseUrl}/api/admin/orders/${savedOrder.id}/status`, {
     method: "PATCH",
@@ -2003,6 +2097,7 @@ test("elimina il profilo cliente conservando gli ordini come ospite", async () =
 test("protegge le API amministrative e gestisce il ciclo completo di un ordine", async () => {
   const unauthorized = await fetch(`${baseUrl}/api/admin/orders`);
   assert.equal(unauthorized.status, 401);
+  assert.equal((await fetch(`${baseUrl}/api/admin/pix`)).status, 401);
   assert.equal((await fetch(`${baseUrl}/api/admin/orders/1/status`, { method: "PATCH" })).status, 401);
 
   const wrongLogin = await fetch(`${baseUrl}/api/admin/login`, {

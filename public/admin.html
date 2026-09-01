@@ -8,7 +8,7 @@
     <link rel="icon" href="/brand/PIX3LLAB-favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/css/base.css?v=1.2.9">
 <link rel="stylesheet" href="/css/layout.css?v=1.2.9">
-<link rel="stylesheet" href="/admin.css?v=1.3.2">
+<link rel="stylesheet" href="/admin.css?v=1.4.0">
     <script type="importmap">
       {
         "imports": {
@@ -53,6 +53,7 @@
               <button class="admin-nav__button" data-view="archive" type="button">Archivio</button>
               <button class="admin-nav__button" data-view="catalog" type="button">Catalogo</button>
               <button class="admin-nav__button" data-view="palette" type="button">Palette</button>
+              <button class="admin-nav__button" data-view="pix" type="button">Pix</button>
             </nav>
           </div>
           <div class="admin-actions">
@@ -189,6 +190,29 @@
               <p class="admin-feedback" id="color-feedback" role="status"></p>
             </section>
           </div>
+        </div>
+
+        <div class="pix-workspace" id="pix-view" hidden>
+          <header class="pix-hero">
+            <img src="/brand/PIX.svg" alt="" aria-hidden="true">
+            <div>
+              <p class="section-number">Profili registrati</p>
+              <h2>Pix</h2>
+              <p>Ogni ordine cliente consegnato assegna un Pix al profilo che lo ha richiesto.</p>
+            </div>
+            <dl>
+              <div><dt>Profili</dt><dd id="pix-profile-count">00</dd></div>
+              <div><dt>Pix ottenuti</dt><dd id="pix-total">0</dd></div>
+            </dl>
+          </header>
+          <section class="pix-profiles" aria-labelledby="pix-profiles-title">
+            <div class="pix-profiles__heading">
+              <div><p class="section-number">Classifica</p><h3 id="pix-profiles-title">Profili e saldo</h3></div>
+              <button id="pix-refresh" type="button">Aggiorna</button>
+            </div>
+            <p class="admin-feedback" id="pix-feedback" role="status">Caricamento profili...</p>
+            <div class="pix-profile-list" id="pix-profile-list"></div>
+          </section>
         </div>
       </section>
     </main>
@@ -355,6 +379,17 @@
       </div>
     </template>
 
+    <template id="pix-profile-template">
+      <article class="pix-profile-card">
+        <img src="/brand/PIX.svg" alt="" aria-hidden="true">
+        <div class="pix-profile-card__identity">
+          <strong data-field="pix-name"></strong>
+          <span data-field="pix-email"></span>
+        </div>
+        <div class="pix-profile-card__balance"><strong data-field="pix-balance"></strong><span>Pix</span></div>
+      </article>
+    </template>
+
     <dialog class="viewer-dialog" id="viewer-dialog" aria-labelledby="viewer-title">
       <div class="viewer-panel">
         <header class="viewer-panel__header">
@@ -382,6 +417,6 @@
       </div>
     </dialog>
 
-    <script type="module" src="/admin.js?v=1.3.2"></script>
+    <script type="module" src="/admin.js?v=1.4.0"></script>
   </body>
 </html>

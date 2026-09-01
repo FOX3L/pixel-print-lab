@@ -26,6 +26,8 @@ export function initAccount() {
   const accountDisplayName = document.querySelector("#account-display-name");
   const accountUsername = document.querySelector("#account-username");
   const accountEmail = document.querySelector("#account-email");
+  const accountPix = document.querySelector("#account-pix");
+  const accountPixBalance = document.querySelector("#account-pix-balance");
   const accountNotificationToggle = document.querySelector("#account-notification-toggle");
   const accountEmailNotifications = document.querySelector("#account-email-notifications");
   const accountPreferencesFeedback = document.querySelector("#account-preferences-feedback");
@@ -74,6 +76,8 @@ export function initAccount() {
         : "";
     accountNotificationToggle.hidden = !state.currentAccount.email || state.currentAccount.role === "admin";
     accountEmailNotifications.checked = state.currentAccount.emailNotificationsEnabled;
+    accountPix.hidden = state.currentAccount.role === "admin";
+    accountPixBalance.textContent = state.currentAccount.pixBalance;
     accountEmailVerification.hidden = !state.currentAccount.email || state.currentAccount.emailVerified;
     accountAdminLink.hidden = state.currentAccount.role !== "admin";
     accountDeleteOpen.hidden = state.currentAccount.role === "admin";

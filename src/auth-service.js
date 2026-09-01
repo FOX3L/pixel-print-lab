@@ -114,6 +114,7 @@ function serializeAccount(account) {
     email: account.email,
     emailVerified: Boolean(account.email_verified_at),
     emailNotificationsEnabled: Boolean(account.email_notifications_enabled),
+    pixBalance: account.pix_balance,
     role: account.role,
   };
 }
