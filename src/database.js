@@ -433,7 +433,23 @@ const migrations = [
     sql: `
       ALTER TABLE user_accounts
       ADD COLUMN email_notifications_enabled INTEGER NOT NULL DEFAULT 1
-        CHECK (email_notifications_enabled IN (0, 1));
+      CHECK (email_notifications_enabled IN (0, 1));
+    `,
+  },
+  {
+    version: 22,
+    name: "add_password_reset_tokens",
+    sql: `
+      CREATE TABLE password_reset_tokens (
+        user_account_id INTEGER PRIMARY KEY,
+        token_hash TEXT NOT NULL UNIQUE,
+        expires_at INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_account_id) REFERENCES user_accounts(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX password_reset_expiry_idx
+        ON password_reset_tokens (expires_at);
     `,
   },
 ];

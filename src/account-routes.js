@@ -11,6 +11,10 @@ const EMAIL_VERIFICATION_WINDOW_MS = 15 * 60 * 1000;
 const MAX_EMAIL_VERIFICATION_ATTEMPTS = 10;
 const EMAIL_RESEND_WINDOW_MS = 60 * 60 * 1000;
 const MAX_EMAIL_RESENDS = 5;
+const PASSWORD_RESET_REQUEST_WINDOW_MS = 60 * 60 * 1000;
+const MAX_PASSWORD_RESET_REQUESTS = 5;
+const PASSWORD_RESET_WINDOW_MS = 15 * 60 * 1000;
+const MAX_PASSWORD_RESET_ATTEMPTS = 10;
 
 function sendAuthError(response, error) {
   if (error instanceof AuthError) {
@@ -92,6 +96,8 @@ export function registerAccountRoutes(
   const registrationAttempts = new Map();
   const emailVerificationAttempts = new Map();
   const emailResendAttempts = new Map();
+  const passwordResetRequests = new Map();
+  const passwordResetAttempts = new Map();
   const listOrders = database.prepare(`
     SELECT * FROM orders
     WHERE user_account_id = ?
@@ -206,6 +212,67 @@ export function registerAccountRoutes(
   });
 
   app.post("/api/account/login", (request, response) => handleLogin(request, response));
+
+  app.post("/api/account/password/forgot", async (request, response) => {
+    try {
+      const email = typeof request.body?.email === "string"
+        ? request.body.email.trim().toLowerCase()
+        : "";
+      if (!disableRateLimits) {
+        const rateLimit = checkRateLimit(
+          passwordResetRequests,
+          `${request.ip}:${email}`,
+          MAX_PASSWORD_RESET_REQUESTS,
+          "Hai richiesto troppi codici. Riprova piu tardi.",
+        );
+        recordAttempt(passwordResetRequests, rateLimit, PASSWORD_RESET_REQUEST_WINDOW_MS);
+      }
+      const reset = auth.createPasswordReset(request.body?.email);
+      if (reset && emailService?.configured) {
+        try {
+          await emailService.sendOrderEmail({
+            to: reset.account.email,
+            subject: "Recupera la password PIX3LLAB",
+            text: [
+              `Il tuo codice di recupero e: ${reset.code}`,
+              "",
+              "Inseriscilo nella schermata di recupero entro 30 minuti.",
+              "Se non hai richiesto tu il reset, puoi ignorare il messaggio.",
+              "",
+            ].join("\n"),
+          });
+        } catch (error) {
+          console.error("Email di recupero password non inviata.", error);
+        }
+      }
+      return response.status(204).end();
+    } catch (error) {
+      return sendAuthError(response, error);
+    }
+  });
+
+  app.post("/api/account/password/reset", async (request, response) => {
+    let rateLimit;
+    try {
+      const email = typeof request.body?.email === "string"
+        ? request.body.email.trim().toLowerCase()
+        : "";
+      if (!disableRateLimits) {
+        rateLimit = checkRateLimit(
+          passwordResetAttempts,
+          `${request.ip}:${email}`,
+          MAX_PASSWORD_RESET_ATTEMPTS,
+          "Troppi tentativi di recupero. Riprova piu tardi.",
+        );
+        recordAttempt(passwordResetAttempts, rateLimit, PASSWORD_RESET_WINDOW_MS);
+      }
+      await auth.resetPassword(request.body?.email, request.body?.code, request.body?.password);
+      if (!disableRateLimits && rateLimit) passwordResetAttempts.delete(rateLimit.key);
+      return response.status(204).end();
+    } catch (error) {
+      return sendAuthError(response, error);
+    }
+  });
 
   app.post("/api/account/logout", (request, response) => {
     auth.logout(request, response);

@@ -447,12 +447,13 @@
 
         <div id="account-guest-view">
           <p class="account-intro">Ordina pure come ospite oppure accedi per conservare lo storico dei tuoi ordini.</p>
-          <div class="account-access-grid">
+          <div class="account-access-grid" id="account-access-grid">
             <form class="account-form" id="account-login-form">
               <h3>Accedi</h3>
               <label for="login-email"><span>Email</span><input id="login-email" name="email" type="email" maxlength="254" autocomplete="email" required></label>
               <label for="login-password"><span>Password</span><input id="login-password" name="password" type="password" autocomplete="current-password" required></label>
               <button type="submit">Entra</button>
+              <button id="account-password-forgot" type="button">Password dimenticata?</button>
             </form>
 
             <form class="account-form" id="account-register-form">
@@ -468,6 +469,17 @@
               <button type="submit">Registrati</button>
             </form>
           </div>
+          <form class="account-form account-password-reset" id="account-password-reset-form" hidden>
+            <h3>Recupera password</h3>
+            <p>Richiedi un codice via email, poi scegli una nuova password.</p>
+            <label for="reset-email"><span>Email</span><input id="reset-email" name="email" type="email" maxlength="254" autocomplete="email" required></label>
+            <button id="account-password-code-request" type="button">Invia codice</button>
+            <label for="reset-code"><span>Codice di recupero</span><input id="reset-code" name="code" type="text" minlength="16" maxlength="16" pattern="[A-Fa-f0-9]{16}" autocomplete="one-time-code" required></label>
+            <label for="reset-password"><span>Nuova password</span><input id="reset-password" name="password" type="password" minlength="10" maxlength="128" autocomplete="new-password" required></label>
+            <button type="submit">Imposta nuova password</button>
+            <button id="account-password-reset-cancel" type="button">Torna al login</button>
+            <p class="account-feedback" id="account-password-reset-feedback" role="status"></p>
+          </form>
           <p class="account-feedback" id="account-guest-feedback" role="status"></p>
         </div>
 

@@ -165,6 +165,6 @@ docker compose up -d
 
 ## Release and license
 
-Stable releases are published on the [Releases](https://github.com/BravePix3l/pixel-print-lab/releases) page. Tags follow semantic versioning and automatically build the Docker image on `ghcr.io/bravepix3l/pixel-print-lab`.
+Stable releases are published on the [Releases](https://github.com/FOX3L/pixel-print-lab/releases) page. Tags follow semantic versioning and automatically build the Docker image on `ghcr.io/fox3l/pixel-print-lab`.
 
 This project is distributed under the [MIT](LICENSE) license.

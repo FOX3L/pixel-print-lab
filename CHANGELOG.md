@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.10.0] - 2026-09-01
+
+### Added
+
+- Recupero password tramite codice monouso inviato via email, valido per 30 minuti e protetto da limiti su richieste e tentativi.
+- Revoca automatica delle sessioni attive e verifica implicita dell'indirizzo email dopo un reset riuscito.
+
+### Fixed
+
+- Aggiornati i file Compose e i riferimenti di distribuzione al namespace `ghcr.io/fox3l/pixel-print-lab`.
+
 ## [1.9.1] - 2026-09-01
 
 ### Fixed

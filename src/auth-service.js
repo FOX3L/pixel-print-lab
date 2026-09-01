@@ -5,6 +5,7 @@ const scrypt = promisify(crypto.scrypt);
 const SESSION_COOKIE = "ppl_session";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000;
 const SCRYPT_KEY_LENGTH = 64;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DUMMY_PASSWORD_HASH = "scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA$KeZz9UqPc9MxmhAJcEbr5s8vLnEhZQGY8nGwjvP2mV8oMsqSx9yknajYdTBCpT7tJYwo4M5GsqTzSZsXj8L98A";
@@ -184,6 +185,29 @@ export function createAuthService({ database, adminEmail, adminPassword }) {
     SET email_notifications_enabled = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ? AND auth_source = 'local'
   `);
+  const storePasswordReset = database.prepare(`
+    INSERT INTO password_reset_tokens (user_account_id, token_hash, expires_at)
+    VALUES (@accountId, @tokenHash, @expiresAt)
+    ON CONFLICT(user_account_id) DO UPDATE SET
+      token_hash = excluded.token_hash,
+      expires_at = excluded.expires_at,
+      created_at = CURRENT_TIMESTAMP
+  `);
+  const findPasswordReset = database.prepare(`
+    SELECT * FROM password_reset_tokens WHERE user_account_id = ?
+  `);
+  const deletePasswordReset = database.prepare(`
+    DELETE FROM password_reset_tokens WHERE user_account_id = ?
+  `);
+  const updateAccountPassword = database.prepare(`
+    UPDATE user_accounts SET
+      password_hash = ?, email_verified_at = COALESCE(email_verified_at, CURRENT_TIMESTAMP),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND auth_source = 'local'
+  `);
+  const deleteAccountSessions = database.prepare(`
+    DELETE FROM user_sessions WHERE user_account_id = ?
+  `);
   const getCredentialsOverride = database.prepare(`
     SELECT admin_username AS username, admin_password_hash AS passwordHash
     FROM app_settings WHERE id = 1
@@ -332,6 +356,51 @@ export function createAuthService({ database, adminEmail, adminPassword }) {
       throw new AuthError("ACCOUNT_NOT_AVAILABLE", "Account non disponibile.", 404);
     }
     return findAccountById.get(accountId);
+  }
+
+  function createPasswordReset(emailValue) {
+    const email = validateOptionalEmail(emailValue)?.toLowerCase();
+    if (!email) return null;
+    const account = findAccountByUsername.get(email);
+    if (!account || account.auth_source !== "local") return null;
+    const code = crypto.randomBytes(8).toString("hex").toUpperCase();
+    storePasswordReset.run({
+      accountId: account.id,
+      tokenHash: tokenHash(code),
+      expiresAt: Date.now() + PASSWORD_RESET_TTL_MS,
+    });
+    return { account, code };
+  }
+
+  const applyPasswordReset = database.transaction((accountId, passwordHash) => {
+    updateAccountPassword.run(passwordHash, accountId);
+    deletePasswordReset.run(accountId);
+    deleteEmailVerification.run(accountId);
+    deleteAccountSessions.run(accountId);
+  });
+
+  async function resetPassword(emailValue, codeValue, passwordValue) {
+    const email = validateOptionalEmail(emailValue)?.toLowerCase();
+    const code = typeof codeValue === "string" ? codeValue.trim().toUpperCase() : "";
+    const password = validatePassword(passwordValue);
+    if (!email || !/^[A-F0-9]{16}$/.test(code)) {
+      throw new AuthError("INVALID_PASSWORD_RESET", "Email o codice di recupero non validi.");
+    }
+    const account = findAccountByUsername.get(email);
+    const reset = account?.auth_source === "local" ? findPasswordReset.get(account.id) : null;
+    if (!reset) {
+      throw new AuthError("INVALID_PASSWORD_RESET", "Email o codice di recupero non validi.");
+    }
+    if (reset.expires_at <= Date.now()) {
+      deletePasswordReset.run(account.id);
+      throw new AuthError("PASSWORD_RESET_EXPIRED", "Il codice e scaduto. Richiedine uno nuovo.", 410);
+    }
+    const expected = Buffer.from(reset.token_hash, "hex");
+    const actual = Buffer.from(tokenHash(code), "hex");
+    if (!crypto.timingSafeEqual(expected, actual)) {
+      throw new AuthError("INVALID_PASSWORD_RESET", "Email o codice di recupero non validi.");
+    }
+    applyPasswordReset(account.id, await hashPassword(password));
   }
 
   async function register({ password: rawPassword, firstName, lastName, email: rawEmail }) {
@@ -508,6 +577,8 @@ export function createAuthService({ database, adminEmail, adminPassword }) {
     createEmailVerification,
     confirmEmail,
     setEmailNotifications,
+    createPasswordReset,
+    resetPassword,
     isAdminEmail: (username) => {
       const adminEmail = effectiveAdminEmail();
       return adminEmail.length > 0 && normalizeUsername(username) === adminEmail;

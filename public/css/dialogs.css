@@ -663,6 +663,12 @@
   box-shadow: 6px 6px 0 var(--orange);
 }
 
+.account-password-reset {
+  max-width: 32rem;
+  margin: 1rem auto 0;
+  box-shadow: 6px 6px 0 var(--orange);
+}
+
 .account-form h3,
 .account-profile h3,
 .account-orders h3 {

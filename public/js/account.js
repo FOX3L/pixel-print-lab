@@ -15,6 +15,13 @@ export function initAccount() {
   const accountUserView = document.querySelector("#account-user-view");
   const accountLoginForm = document.querySelector("#account-login-form");
   const accountRegisterForm = document.querySelector("#account-register-form");
+  const accountAccessGrid = document.querySelector("#account-access-grid");
+  const accountPasswordForgot = document.querySelector("#account-password-forgot");
+  const accountPasswordResetForm = document.querySelector("#account-password-reset-form");
+  const accountPasswordCodeRequest = document.querySelector("#account-password-code-request");
+  const accountPasswordResetCancel = document.querySelector("#account-password-reset-cancel");
+  const accountPasswordResetFeedback = document.querySelector("#account-password-reset-feedback");
+  const resetEmailInput = document.querySelector("#reset-email");
   const accountGuestFeedback = document.querySelector("#account-guest-feedback");
   const accountDisplayName = document.querySelector("#account-display-name");
   const accountUsername = document.querySelector("#account-username");
@@ -216,6 +223,66 @@ export function initAccount() {
   accountRegisterForm.addEventListener("submit", (event) => {
     event.preventDefault();
     submitAccountForm(accountRegisterForm, "/api/account/register");
+  });
+  accountPasswordForgot.addEventListener("click", () => {
+    resetEmailInput.value = document.querySelector("#login-email").value;
+    accountAccessGrid.hidden = true;
+    accountPasswordResetForm.hidden = false;
+    accountGuestFeedback.textContent = "";
+    resetEmailInput.focus();
+  });
+  accountPasswordResetCancel.addEventListener("click", () => {
+    accountPasswordResetForm.hidden = true;
+    accountAccessGrid.hidden = false;
+    accountPasswordResetFeedback.textContent = "";
+    document.querySelector("#login-email").focus();
+  });
+  accountPasswordCodeRequest.addEventListener("click", async () => {
+    if (!resetEmailInput.reportValidity()) return;
+    accountPasswordCodeRequest.disabled = true;
+    accountPasswordResetFeedback.textContent = "Invio in corso...";
+    accountPasswordResetFeedback.classList.remove("account-feedback--error");
+    try {
+      await api("/api/account/password/forgot", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: resetEmailInput.value }),
+      });
+      accountPasswordResetFeedback.textContent = "Se l'email e registrata, riceverai un codice entro pochi minuti.";
+      document.querySelector("#reset-code").focus();
+    } catch (error) {
+      accountPasswordResetFeedback.textContent = error.message;
+      accountPasswordResetFeedback.classList.add("account-feedback--error");
+    } finally {
+      accountPasswordCodeRequest.disabled = false;
+    }
+  });
+  accountPasswordResetForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submitButton = accountPasswordResetForm.querySelector('[type="submit"]');
+    submitButton.disabled = true;
+    accountPasswordResetFeedback.textContent = "Aggiornamento password...";
+    accountPasswordResetFeedback.classList.remove("account-feedback--error");
+    try {
+      const values = Object.fromEntries(new FormData(accountPasswordResetForm));
+      await api("/api/account/password/reset", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      accountPasswordResetForm.reset();
+      accountPasswordResetForm.hidden = true;
+      accountAccessGrid.hidden = false;
+      document.querySelector("#login-email").value = values.email;
+      accountGuestFeedback.textContent = "Password aggiornata. Ora puoi accedere.";
+      accountGuestFeedback.classList.remove("account-feedback--error");
+      document.querySelector("#login-password").focus();
+    } catch (error) {
+      accountPasswordResetFeedback.textContent = error.message;
+      accountPasswordResetFeedback.classList.add("account-feedback--error");
+    } finally {
+      submitButton.disabled = false;
+    }
   });
   accountEmailVerificationForm.addEventListener("submit", async (event) => {
     event.preventDefault();

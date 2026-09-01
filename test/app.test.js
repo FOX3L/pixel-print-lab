@@ -201,6 +201,8 @@ test("serve la pagina pubblica con un catalogo accessibile", async () => {
   assert.match(page, /id="account-email-verification-form"/);
   assert.match(page, /autocomplete="one-time-code"/);
   assert.match(page, /id="account-email-notifications" type="checkbox"/);
+  assert.match(page, /id="account-password-forgot"/);
+  assert.match(page, /id="account-password-reset-form"/);
   assert.match(page, /id="confirmation-code"/);
   assert.match(page, /type="importmap"/);
   assert.match(page, /<script type="module" src="\/app.js(\?v=[^"]+)?"><\/script>/);
@@ -320,7 +322,7 @@ test("il seed puo essere eseguito piu volte senza duplicare dati", () => {
 
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM products").get().count, 2);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM colors").get().count, 4);
-  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 21);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 22);
   assert.ok(database.prepare("SELECT email_verified_at FROM user_accounts LIMIT 1"));
   assert.equal(database.prepare("SELECT email_notifications_enabled FROM app_settings WHERE id = 1").get().email_notifications_enabled, 0);
 });
@@ -384,7 +386,7 @@ test("migra un catalogo esistente senza perdere dati e impedisce il riuso degli 
     assert.equal(legacyDatabase.prepare("SELECT model_format FROM order_items WHERE id = 1").get().model_format, "stl");
     assert.equal(legacyDatabase.prepare("SELECT status FROM orders WHERE id = 1").get().status, "in_attesa");
     assert.equal(legacyDatabase.prepare("SELECT comment FROM orders WHERE id = 1").get().comment, null);
-    assert.equal(legacyDatabase.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 21);
+    assert.equal(legacyDatabase.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 22);
     assert.equal(legacyDatabase.prepare("SELECT COUNT(*) AS count FROM email_verification_tokens").get().count, 0);
     assert.equal(legacyDatabase.prepare("SELECT email_notifications_enabled FROM app_settings WHERE id = 1").get().email_notifications_enabled, 0);
     assert.equal(legacyDatabase.prepare("SELECT admin_username FROM app_settings WHERE id = 1").get().admin_username, null);
@@ -1786,6 +1788,104 @@ test("gestisce account, storico personale e accesso amministrativo unificato", a
   database.prepare("DELETE FROM orders WHERE id = ?").run(savedCustomOrder.id);
   database.prepare("DELETE FROM orders WHERE id = ?").run(savedLinkOrder.id);
   database.prepare("DELETE FROM user_accounts WHERE id = ?").run(secondAccount.data.id);
+});
+
+test("recupera la password senza rivelare gli account registrati", async () => {
+  const neutralEmailCount = sentEmails.length;
+  for (const email of ["sconosciuto@example.test", "admin@example.test"]) {
+    const response = await fetch(`${baseUrl}/api/account/password/forgot`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    assert.equal(response.status, 204);
+  }
+  assert.equal(sentEmails.length, neutralEmailCount);
+
+  const registration = await fetch(`${baseUrl}/api/account/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      email: "recupero@example.test",
+      password: "password-iniziale-sicura",
+      firstName: "Recupero",
+      lastName: "Password",
+    }),
+  });
+  const account = (await registration.json()).data;
+  const originalCookie = registration.headers.get("set-cookie").split(";", 1)[0];
+  assert.equal(registration.status, 201);
+
+  const forgot = await fetch(`${baseUrl}/api/account/password/forgot`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "RECUPERO@example.test" }),
+  });
+  assert.equal(forgot.status, 204);
+  const firstResetEmail = sentEmails.at(-1);
+  assert.equal(firstResetEmail.to, "recupero@example.test");
+  assert.match(firstResetEmail.subject, /Recupera la password/);
+  const firstCode = firstResetEmail.text.match(/[A-F0-9]{16}/)?.[0];
+  assert.ok(firstCode);
+
+  const invalidReset = await fetch(`${baseUrl}/api/account/password/reset`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      email: "recupero@example.test",
+      code: "0000000000000000",
+      password: "password-nuova-sicura",
+    }),
+  });
+  assert.equal(invalidReset.status, 400);
+  assert.equal((await invalidReset.json()).error.code, "INVALID_PASSWORD_RESET");
+
+  database.prepare("UPDATE password_reset_tokens SET expires_at = 0 WHERE user_account_id = ?").run(account.id);
+  const expiredReset = await fetch(`${baseUrl}/api/account/password/reset`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      email: "recupero@example.test",
+      code: firstCode,
+      password: "password-nuova-sicura",
+    }),
+  });
+  assert.equal(expiredReset.status, 410);
+  assert.equal((await expiredReset.json()).error.code, "PASSWORD_RESET_EXPIRED");
+
+  await fetch(`${baseUrl}/api/account/password/forgot`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "recupero@example.test" }),
+  });
+  const validCode = sentEmails.at(-1).text.match(/[A-F0-9]{16}/)?.[0];
+  const validReset = await fetch(`${baseUrl}/api/account/password/reset`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      email: "recupero@example.test",
+      code: validCode.toLowerCase(),
+      password: "password-nuova-sicura",
+    }),
+  });
+  assert.equal(validReset.status, 204);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM password_reset_tokens WHERE user_account_id = ?").get(account.id).count, 0);
+  assert.ok(database.prepare("SELECT email_verified_at FROM user_accounts WHERE id = ?").get(account.id).email_verified_at);
+  assert.equal((await fetch(`${baseUrl}/api/account/session`, { headers: { cookie: originalCookie } })).status, 401);
+
+  const oldPasswordLogin = await fetch(`${baseUrl}/api/account/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "recupero@example.test", password: "password-iniziale-sicura" }),
+  });
+  assert.equal(oldPasswordLogin.status, 401);
+  const newPasswordLogin = await fetch(`${baseUrl}/api/account/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "recupero@example.test", password: "password-nuova-sicura" }),
+  });
+  assert.equal(newPasswordLogin.status, 201);
+  database.prepare("DELETE FROM user_accounts WHERE id = ?").run(account.id);
 });
 
 test("protegge le API amministrative e gestisce il ciclo completo di un ordine", async () => {

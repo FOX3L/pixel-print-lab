@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/bravepix3l/pixel-print-lab:latest
+    image: ghcr.io/fox3l/pixel-print-lab:latest
     build:
       context: .
       dockerfile: Dockerfile
