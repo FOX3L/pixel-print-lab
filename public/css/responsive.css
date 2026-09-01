@@ -175,7 +175,7 @@
   }
 
   .print-scene__object {
-    transform: scaleY(1) !important;
+    transform: none !important;
   }
 }
 
@@ -355,11 +355,6 @@
     font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
-  }
-
-  .print-scene__head,
-  .print-scene__filament {
-    animation-name: print-head-mobile;
   }
 
   .catalog {

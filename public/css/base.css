@@ -201,21 +201,13 @@ button:disabled {
 }
 
 @keyframes print-head {
-  0% { transform: translate(-2rem, 0); }
-  20% { transform: translate(2rem, -1.4rem); }
-  40% { transform: translate(-2rem, -2.8rem); }
-  60% { transform: translate(2rem, -4.2rem); }
-  80% { transform: translate(-2rem, -5.6rem); }
-  100% { transform: translate(2rem, -7rem); }
+  0%, 100% { transform: translateX(-2.4rem); }
+  50% { transform: translateX(2.4rem); }
 }
 
 @keyframes print-object {
-  0% { transform: translateX(-50%) scaleY(0); }
-  20% { transform: translateX(-50%) scaleY(0.2); }
-  40% { transform: translateX(-50%) scaleY(0.4); }
-  60% { transform: translateX(-50%) scaleY(0.6); }
-  80% { transform: translateX(-50%) scaleY(0.8); }
-  100% { transform: translateX(-50%) scaleY(1); }
+  0%, 100% { opacity: 0.72; }
+  50% { opacity: 1; }
 }
 
 @keyframes viewer-layer {
@@ -230,13 +222,4 @@ button:disabled {
 @keyframes request-print {
   from { height: 25%; }
   to { height: 100%; }
-}
-
-@keyframes print-head-mobile {
-  0% { transform: translate(-1.5rem, 0); }
-  20% { transform: translate(1.5rem, -1.4rem); }
-  40% { transform: translate(-1.5rem, -2.8rem); }
-  60% { transform: translate(1.5rem, -4.2rem); }
-  80% { transform: translate(-1.5rem, -5.6rem); }
-  100% { transform: translate(1.5rem, -7rem); }
 }

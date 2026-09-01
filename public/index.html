@@ -6,12 +6,12 @@
     <meta name="description" content="Scegli un modello o proponi il tuo file 3MF per una stampa 3D.">
     <title>Pixel Print Lab | PIX3LLAB</title>
     <link rel="icon" href="/brand/PIX3LLAB-favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="/css/base.css?v=1.2.9">
-    <link rel="stylesheet" href="/css/layout.css?v=1.2.9">
+    <link rel="stylesheet" href="/css/base.css?v=1.3.1">
+    <link rel="stylesheet" href="/css/layout.css?v=1.3.1">
     <link rel="stylesheet" href="/css/catalog.css?v=1.2.9">
     <link rel="stylesheet" href="/css/custom-model.css?v=1.2.9">
     <link rel="stylesheet" href="/css/dialogs.css?v=1.2.9">
-    <link rel="stylesheet" href="/css/responsive.css?v=1.2.9">
+    <link rel="stylesheet" href="/css/responsive.css?v=1.3.1">
     <script type="importmap">
       {
         "imports": {
@@ -56,13 +56,77 @@
             </div>
           </div>
 
-        <div class="print-scene" aria-label="Illustrazione pixel art di una stampante 3D in funzione" role="img">
+        <div class="print-scene" aria-label="Blueprint tecnico animato di una stampante 3D" role="img">
           <div class="print-scene__screen" id="print-scene-screen">PRINT_01</div>
-          <div class="print-scene__rail"></div>
-          <div class="print-scene__head"></div>
-          <div class="print-scene__filament"></div>
-          <div class="print-scene__object"></div>
-          <div class="print-scene__bed"></div>
+          <svg class="print-scene__art" viewBox="0 0 640 640" aria-hidden="true">
+            <defs>
+              <pattern id="blueprint-minor-grid" width="16" height="16" patternUnits="userSpaceOnUse">
+                <path d="M16 0H0V16" fill="none" stroke="#4277ff" stroke-width="0.7" opacity="0.35"/>
+              </pattern>
+              <pattern id="blueprint-grid" width="80" height="80" patternUnits="userSpaceOnUse">
+                <rect width="80" height="80" fill="url(#blueprint-minor-grid)"/>
+                <path d="M80 0H0V80" fill="none" stroke="#89a5ff" stroke-width="1.2" opacity="0.45"/>
+              </pattern>
+            </defs>
+            <rect width="640" height="640" fill="url(#blueprint-grid)"/>
+
+            <g class="blueprint__title">
+              <text x="170" y="38">ASSEMBLY / FDM-01 / FRONT ELEVATION</text>
+              <text x="170" y="55">SCALE 1:08 / UNITS MM</text>
+            </g>
+
+            <g class="blueprint__dimensions">
+              <path d="M108 96H532M108 86v20M532 86v20"/>
+              <path d="M83 124V510M73 124h20M73 510h20"/>
+              <text x="282" y="87">424.00</text>
+              <text x="61" y="348" transform="rotate(-90 61 348)">386.00</text>
+            </g>
+
+            <g class="blueprint__machine">
+              <path d="M108 510V124H532V510M92 510H548"/>
+              <path d="M108 124H532M126 164H514"/>
+              <path d="M138 201H502"/>
+              <path d="M151 476H489L516 510H124Z"/>
+              <circle cx="151" cy="201" r="13"/><circle cx="489" cy="201" r="13"/>
+              <path d="M159 201H481" class="blueprint__accent-line"/>
+            </g>
+
+            <g class="print-scene__head">
+              <path d="M287 191H353V258L340 276H300L287 258Z"/>
+              <rect x="299" y="204" width="42" height="29"/>
+              <circle cx="320" cy="219" r="8"/>
+              <path d="M309 276H331L324 298H316Z"/>
+              <path d="M320 298V322" class="blueprint__nozzle"/>
+            </g>
+
+            <g class="print-scene__object">
+              <path d="M230 476L258 342H382L410 476Z"/>
+              <path d="M238 440H402M244 410H396M250 380H390M257 350H383"/>
+            </g>
+
+            <g class="blueprint__origin">
+              <circle cx="320" cy="322" r="8"/>
+              <path d="M298 322H342M320 300V344"/>
+              <text x="331" y="339">X0 / Z148</text>
+            </g>
+
+            <g class="blueprint__callouts">
+              <path d="M502 201L571 148M353 225L553 280M382 392L552 405M151 476L71 439"/>
+              <circle cx="502" cy="201" r="5"/><circle cx="353" cy="225" r="5"/><circle cx="382" cy="392" r="5"/><circle cx="151" cy="476" r="5"/>
+              <text x="472" y="139">GANTRY A-04</text>
+              <text x="486" y="275">EXTRUDER E-02</text>
+              <text x="494" y="399">PART VOLUME</text>
+              <text x="28" y="430">HEATED BED</text>
+            </g>
+
+            <g class="blueprint__data-block">
+              <rect x="431" y="522" width="174" height="63"/>
+              <path d="M431 546H605M518 546V585"/>
+              <text x="443" y="539">PIX3LLAB / REV.04</text>
+              <text x="443" y="565">DWG</text><text x="443" y="578">PRINT_01</text>
+              <text x="530" y="565">STATUS</text><text x="530" y="578">ACTIVE</text>
+            </g>
+          </svg>
           <div class="print-scene__progress"><span id="print-scene-progress-bar"></span></div>
           <p id="print-scene-progress-text">Livello 0 / 0</p>
         </div>

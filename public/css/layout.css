@@ -169,33 +169,26 @@ h1 em {
   aspect-ratio: 1 / 1;
   min-height: 22rem;
   border: var(--line);
-  background: var(--panel);
-  box-shadow: 12px 12px 0 var(--ink);
+  background: #15213f;
+  border-color: var(--blue);
+  box-shadow: 12px 12px 0 var(--ink), 16px 16px 0 var(--orange);
   overflow: hidden;
-}
-
-.print-scene::before,
-.print-scene::after {
-  content: "";
-  position: absolute;
-  background: var(--ink);
+  isolation: isolate;
 }
 
 .print-scene::before {
-  top: 4rem;
-  right: 2.5rem;
-  bottom: 4rem;
-  left: 2.5rem;
-  background: transparent;
-  border-right: 0.5rem solid var(--ink);
-  border-left: 0.5rem solid var(--ink);
-}
-
-.print-scene::after {
-  right: 2rem;
-  bottom: 3.5rem;
-  left: 2rem;
-  height: 0.75rem;
+  content: "02 / BLUEPRINT";
+  position: absolute;
+  z-index: 4;
+  top: 1.25rem;
+  left: 1.25rem;
+  padding: 0.4rem 0.55rem;
+  color: #15213f;
+  background: var(--orange);
+  border: 2px solid #ffb097;
+  box-shadow: 3px 3px 0 var(--ink);
+  font-size: 0.6rem;
+  font-weight: 700;
 }
 
 .print-scene__screen {
@@ -204,68 +197,125 @@ h1 em {
   top: 1.25rem;
   right: 1.25rem;
   padding: 0.45rem 0.6rem;
-  color: var(--green);
-  background: var(--ink);
+  color: var(--orange);
+  background: #0f1932;
+  border: 1px solid #89a5ff;
   font-size: 0.65rem;
 }
 
-.print-scene__rail {
+.print-scene__art {
   position: absolute;
-  z-index: 2;
-  top: 7rem;
-  right: 2.5rem;
-  left: 2.5rem;
-  height: 0.6rem;
-  background: var(--ink);
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .print-scene__head {
-  position: absolute;
-  z-index: 3;
-  top: 16.5rem;
-  left: calc(50% - 1.5rem);
-  width: 3rem;
-  height: 2.5rem;
-  background: var(--blue);
-  border: 0.45rem solid var(--ink);
-  animation: print-head 7s steps(5, jump-none) infinite;
-}
-
-.print-scene__filament {
-  position: absolute;
-  z-index: 2;
-  top: 19rem;
-  left: calc(50% - 0.25rem);
-  width: 0.5rem;
-  height: 2.5rem;
-  background: var(--orange);
-  animation: print-head 7s steps(5, jump-none) infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: print-head 6s steps(6, jump-none) infinite;
 }
 
 .print-scene__object {
-  position: absolute;
-  z-index: 2;
-  left: 50%;
-  bottom: 4.25rem;
-  width: 38%;
-  height: 22%;
-  background: var(--orange);
-  clip-path: polygon(18% 0, 82% 0, 100% 100%, 0 100%);
-  box-shadow: inset 0 -0.5rem rgba(23, 32, 26, 0.22);
-  transform-origin: bottom;
-  transform: translateX(-50%) scaleY(0);
-  animation: print-object 7s steps(5, jump-none) infinite;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: print-object 2.4s steps(2, jump-none) infinite;
 }
 
-.print-scene__bed {
-  position: absolute;
-  z-index: 3;
-  right: 3rem;
-  bottom: 3.25rem;
-  left: 3rem;
-  height: 0.75rem;
-  background: var(--blue);
-  border: 0.25rem solid var(--ink);
+.blueprint__title {
+  fill: var(--orange);
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.blueprint__dimensions path,
+.blueprint__origin path,
+.blueprint__origin circle {
+  fill: none;
+  stroke: #89a5ff;
+  stroke-width: 1.5;
+}
+
+.blueprint__dimensions text,
+.blueprint__origin text {
+  fill: #dce4ff;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.blueprint__machine,
+.print-scene__head {
+  fill: none;
+  stroke: #b9c8ff;
+  stroke-width: 4;
+}
+
+.blueprint__machine .blueprint__accent-line {
+  stroke: var(--blue);
+  stroke-width: 6;
+}
+
+.print-scene__head rect {
+  fill: #15213f;
+  stroke: var(--blue);
+}
+
+.print-scene__head circle {
+  fill: var(--orange);
+  stroke: #ffb097;
+}
+
+.print-scene__head .blueprint__nozzle {
+  stroke: var(--orange);
+  stroke-width: 5;
+}
+
+.print-scene__object {
+  fill: rgba(255, 101, 52, 0.08);
+  stroke: var(--orange);
+  stroke-width: 5;
+}
+
+.print-scene__object path:not(:first-child) {
+  stroke-width: 2;
+  opacity: 0.7;
+}
+
+.blueprint__callouts {
+  fill: none;
+  stroke: #89a5ff;
+  stroke-width: 1.5;
+}
+
+.blueprint__callouts circle {
+  fill: var(--orange);
+  stroke: none;
+}
+
+.blueprint__callouts text {
+  fill: #dce4ff;
+  stroke: none;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+.blueprint__data-block {
+  fill: none;
+  stroke: #89a5ff;
+  stroke-width: 1.5;
+}
+
+.blueprint__data-block text {
+  fill: #dce4ff;
+  stroke: none;
+  font-size: 0.55rem;
+}
+
+.blueprint__data-block text:nth-of-type(3),
+.blueprint__data-block text:nth-of-type(5) {
+  fill: var(--orange);
+  font-weight: 700;
 }
 
 .print-scene__progress {
@@ -274,14 +324,15 @@ h1 em {
   bottom: 1.25rem;
   left: 1.25rem;
   height: 0.6rem;
-  border: 2px solid var(--ink);
+  border: 2px solid #89a5ff;
+  background: #0f1932;
 }
 
 .print-scene__progress span {
   display: block;
   width: 0%;
   height: 100%;
-  background-color: var(--green);
+  background-color: var(--orange);
   background-image: linear-gradient(
     45deg,
     rgba(255, 255, 255, 0.15) 25%,
@@ -304,6 +355,7 @@ h1 em {
   margin: 0;
   font-size: 0.6rem;
   font-weight: 700;
+  color: #dce4ff;
 }
 
 .section-heading {

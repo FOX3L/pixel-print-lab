@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.8.0] - 2026-09-01
+
+### Changed
+
+- Ridisegnata l'illustrazione della stampante nella hero come blueprint tecnico animato, con griglia CAD, quote, callout e stato di avanzamento integrato.
+
 ## [1.7.0] - 2026-08-17
 
 ### Added
