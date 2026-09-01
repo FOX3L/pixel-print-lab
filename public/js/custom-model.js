@@ -4,6 +4,7 @@ import { api } from "./api.js";
 import { euroFormatter } from "./format.js";
 import { createColorOption } from "./colors.js";
 import { getViewerModule } from "./viewer-loader.js";
+import { setCartFeedback } from "./cart-ui.js";
 
 const MAX_MODEL_FILE_SIZE = 500 * 1024 * 1024;
 
@@ -248,9 +249,13 @@ export function initCustomModel() {
       customPreviewButton.disabled = true;
       customQuoteButton.disabled = true;
       updateCustomSource();
-      customFeedback.textContent = quoteData.quoteUnitPriceCents
-        ? `Richiesta aggiunta al carrello. Stima ${euroFormatter.format(quoteData.quoteUnitPriceCents / 100)} al pezzo.`
-        : "Richiesta aggiunta al carrello. Prezzo da definire.";
+      setCartFeedback(
+        customFeedback,
+        "Richiesta aggiunta al ",
+        quoteData.quoteUnitPriceCents
+          ? `. Stima ${euroFormatter.format(quoteData.quoteUnitPriceCents / 100)} al pezzo.`
+          : ". Prezzo da definire.",
+      );
       inspectedUpload = undefined;
       discardQuote();
       uploadedId = undefined;

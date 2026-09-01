@@ -8,7 +8,7 @@
     <link rel="icon" href="/brand/PIX3LLAB-favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/css/base.css?v=1.2.9">
 <link rel="stylesheet" href="/css/layout.css?v=1.2.9">
-<link rel="stylesheet" href="/admin.css?v=1.2.9">
+<link rel="stylesheet" href="/admin.css?v=1.3.2">
     <script type="importmap">
       {
         "imports": {
@@ -26,8 +26,8 @@
         <h1 id="login-title">Pixel Print<br>Control Room</h1>
         <p>Inserisci le credenziali amministrative configurate sul server.</p>
         <form id="login-form">
-          <label for="admin-username">Nome utente</label>
-          <input id="admin-username" name="username" type="text" autocomplete="username" required autofocus>
+          <label for="admin-email">Email</label>
+          <input id="admin-email" name="email" type="email" autocomplete="email" required autofocus>
           <label for="admin-password">Password</label>
           <input id="admin-password" name="password" type="password" autocomplete="current-password" required>
           <p class="admin-feedback" id="login-feedback" role="status"></p>
@@ -113,6 +113,11 @@
                 <div><span>Nome</span><strong id="order-first-name"></strong></div>
                 <div><span>Cognome</span><strong id="order-last-name"></strong></div>
               </div>
+
+              <section class="admin-comment" id="order-comment-panel" hidden>
+                <span>Commento del cliente</span>
+                <p id="order-comment"></p>
+              </section>
 
               <div class="admin-items-heading">
                 <h3>Elementi</h3>
@@ -269,8 +274,8 @@
             <p class="section-number">Accesso</p>
             <h3 id="settings-account-title">Credenziali amministrative</h3>
             <label class="settings-field">
-              <span>Nome utente</span>
-              <input id="credentials-username" name="username" type="text" autocomplete="username" required>
+              <span>Email</span>
+              <input id="credentials-email" name="email" type="email" autocomplete="email" required>
             </label>
             <label class="settings-field">
               <span>Password attuale</span>
@@ -280,7 +285,7 @@
               <span>Nuova password</span>
               <input id="credentials-new-password" name="password" type="password" autocomplete="new-password" minlength="10" aria-describedby="credentials-password-hint">
             </label>
-            <p class="settings-hint" id="credentials-password-hint">Lascia vuota la nuova password per cambiare soltanto il nome utente. Dopo il salvataggio dovrai accedere di nuovo; le sessioni attive vengono chiuse.</p>
+            <p class="settings-hint" id="credentials-password-hint">Lascia vuota la nuova password per cambiare soltanto l'email. Dopo il salvataggio dovrai accedere di nuovo; le sessioni attive vengono chiuse.</p>
             <p class="settings-hint">Se dimentichi le credenziali personalizzate, il comando <code>npm run admin:reset</code> ripristina quelle delle variabili d'ambiente.</p>
           </section>
           <p class="admin-feedback" id="credentials-feedback" role="status"></p>
@@ -377,6 +382,6 @@
       </div>
     </dialog>
 
-    <script type="module" src="/admin.js?v=1.2.0"></script>
+    <script type="module" src="/admin.js?v=1.3.2"></script>
   </body>
 </html>

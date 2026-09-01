@@ -47,7 +47,7 @@ before(async () => {
     uploadDirectory,
     orderFileDirectory,
     catalogDirectory,
-    adminUsername: "test-admin",
+    adminEmail: "admin@example.test",
     adminPassword: "test-admin-password",
     emailService,
     uploadRateLimit: false,
@@ -75,7 +75,7 @@ async function authenticateAdmin() {
   const response = await fetch(`${baseUrl}/api/admin/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ username: "test-admin", password: "test-admin-password" }),
+    body: JSON.stringify({ email: "admin@example.test", password: "test-admin-password" }),
   });
   assert.equal(response.status, 201);
   return response.headers.get("set-cookie").split(";", 1)[0];
@@ -191,6 +191,16 @@ test("serve la pagina pubblica con un catalogo accessibile", async () => {
   assert.match(page, /id="custom-link"/);
   assert.match(page, /id="checkout-dialog"/);
   assert.match(page, /id="checkout-form"/);
+  assert.match(page, /id="guest-order-dialog"/);
+  assert.match(page, /id="guest-order-continue"/);
+  assert.match(page, /id="guest-order-account"/);
+  assert.match(page, /<textarea id="order-comment" name="comment"[^>]*maxlength="500"/);
+  assert.match(page, /<input id="register-email" name="email" type="email"[^>]*maxlength="254"/);
+  assert.match(page, /<input id="login-email" name="email" type="email"[^>]*maxlength="254"/);
+  assert.doesNotMatch(page, /id="register-username"/);
+  assert.match(page, /id="account-email-verification-form"/);
+  assert.match(page, /autocomplete="one-time-code"/);
+  assert.match(page, /id="account-email-notifications" type="checkbox"/);
   assert.match(page, /id="confirmation-code"/);
   assert.match(page, /type="importmap"/);
   assert.match(page, /<script type="module" src="\/app.js(\?v=[^"]+)?"><\/script>/);
@@ -221,12 +231,15 @@ test("mostra i dettagli amministrativi dell'ordine in sola lettura", async () =>
 
   assert.match(page, /<strong id="order-first-name"><\/strong>/);
   assert.match(page, /<strong id="order-last-name"><\/strong>/);
+  assert.match(page, /<p id="order-comment"><\/p>/);
   assert.doesNotMatch(page, /id="add-catalog-item"/);
   assert.doesNotMatch(page, /id="save-order"/);
   assert.doesNotMatch(page, /data-field="remove-item"/);
   assert.match(page, /id="settings-button"/);
   assert.match(page, /id="settings-dialog"/);
   assert.match(page, /id="email-notifications-enabled"/);
+  assert.match(page, /id="admin-email" name="email" type="email"/);
+  assert.match(page, /id="credentials-email" name="email" type="email"/);
 });
 
 test("riconosce e usa una configurazione SMTP completa", async () => {
@@ -253,6 +266,13 @@ test("riconosce e usa una configurazione SMTP completa", async () => {
     to: "ordini@example.test",
     subject: "Nuovo ordine",
     text: "Dettagli",
+  });
+  await service.sendOrderEmail({ to: "cliente@example.test", subject: "Stato ordine", text: "In lavorazione" });
+  assert.deepEqual(sentMessage, {
+    from: "noreply@example.test",
+    to: "cliente@example.test",
+    subject: "Stato ordine",
+    text: "In lavorazione",
   });
 });
 
@@ -300,7 +320,8 @@ test("il seed puo essere eseguito piu volte senza duplicare dati", () => {
 
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM products").get().count, 2);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM colors").get().count, 4);
-  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 16);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 21);
+  assert.ok(database.prepare("SELECT email_verified_at FROM user_accounts LIMIT 1"));
   assert.equal(database.prepare("SELECT email_notifications_enabled FROM app_settings WHERE id = 1").get().email_notifications_enabled, 0);
 });
 
@@ -362,7 +383,9 @@ test("migra un catalogo esistente senza perdere dati e impedisce il riuso degli 
     assert.match(legacyDatabase.prepare("SELECT sql FROM sqlite_master WHERE name = 'colors'").get().sql, /AUTOINCREMENT/);
     assert.equal(legacyDatabase.prepare("SELECT model_format FROM order_items WHERE id = 1").get().model_format, "stl");
     assert.equal(legacyDatabase.prepare("SELECT status FROM orders WHERE id = 1").get().status, "in_attesa");
-    assert.equal(legacyDatabase.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 16);
+    assert.equal(legacyDatabase.prepare("SELECT comment FROM orders WHERE id = 1").get().comment, null);
+    assert.equal(legacyDatabase.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 21);
+    assert.equal(legacyDatabase.prepare("SELECT COUNT(*) AS count FROM email_verification_tokens").get().count, 0);
     assert.equal(legacyDatabase.prepare("SELECT email_notifications_enabled FROM app_settings WHERE id = 1").get().email_notifications_enabled, 0);
     assert.equal(legacyDatabase.prepare("SELECT admin_username FROM app_settings WHERE id = 1").get().admin_username, null);
       legacyDatabase.prepare("DELETE FROM products WHERE id = 7").run();
@@ -373,6 +396,33 @@ test("migra un catalogo esistente senza perdere dati e impedisce il riuso degli 
     assert.ok(nextId > 7);
   } finally {
     legacyDatabase.close();
+  }
+});
+
+test("rimuove i vecchi account cliente conservando gli ordini come ospite", () => {
+  const previousDatabase = openDatabase(":memory:");
+  try {
+    seedDatabase(previousDatabase);
+    const accountId = Number(previousDatabase.prepare(`
+      INSERT INTO user_accounts (username, password_hash, first_name, last_name)
+      VALUES ('vecchio.cliente', 'hash', 'Vecchio', 'Cliente')
+    `).run().lastInsertRowid);
+    const orderId = Number(previousDatabase.prepare(`
+      INSERT INTO orders (code, first_name, last_name, catalog_total_cents, user_account_id)
+      VALUES ('PPL-LEGACY-ACCOUNT', 'Vecchio', 'Cliente', 1200, ?)
+    `).run(accountId).lastInsertRowid);
+    previousDatabase.exec(`
+      DROP INDEX user_accounts_email_idx;
+      DELETE FROM schema_migrations WHERE version = 20;
+    `);
+
+    migrateDatabase(previousDatabase);
+
+    assert.equal(previousDatabase.prepare("SELECT COUNT(*) AS count FROM user_accounts WHERE auth_source = 'local'").get().count, 0);
+    assert.equal(previousDatabase.prepare("SELECT user_account_id FROM orders WHERE id = ?").get(orderId).user_account_id, null);
+    assert.ok(previousDatabase.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'user_accounts_email_idx'").get());
+  } finally {
+    previousDatabase.close();
   }
 });
 
@@ -674,6 +724,7 @@ test("crea una richiesta mista con snapshot e file permanente senza email automa
     body: JSON.stringify({
       firstName: "  Mauro ",
       lastName: " Rossi  ",
+      comment: "  Vorrei la superficie liscia.\r\nGrazie.  ",
       items: [
         { type: "catalog", productId: 1, colorId: 1, quantity: 2, priceCents: 1 },
         {
@@ -706,6 +757,7 @@ test("crea una richiesta mista con snapshot e file permanente senza email automa
     .all(order.id);
   assert.equal(order.first_name, "Mauro");
   assert.equal(order.last_name, "Rossi");
+  assert.equal(order.comment, "Vorrei la superficie liscia.\nGrazie.");
   assert.equal(order.catalog_total_cents, 2400);
   assert.equal(order.status, "in_attesa");
   assert.equal(order.user_account_id, null);
@@ -720,6 +772,10 @@ test("crea una richiesta mista con snapshot e file permanente senza email automa
   assert.equal(items[2].source_name, "MakerWorld");
 
   const cookie = await authenticateAdmin();
+  const orderDetail = (await (await fetch(`${baseUrl}/api/admin/orders/${order.id}`, {
+    headers: { cookie },
+  })).json()).data;
+  assert.equal(orderDetail.comment, "Vorrei la superficie liscia.\nGrazie.");
   const actualResponse = await fetch(`${baseUrl}/api/admin/orders/${order.id}/items/${items[1].id}/actual-quote`, {
     method: "PATCH",
     headers: { "content-type": "application/json", cookie },
@@ -748,7 +804,7 @@ test("gestisce l'invio SMTP opzionale dalle impostazioni amministrative", async 
     emailNotificationsEnabled: false,
     smtpConfigured: true,
     smtpRecipient: "ordini@example.test",
-    adminUsername: "test-admin",
+    adminEmail: "admin@example.test",
     adminCredentialsCustomized: false,
     pricing: DEFAULT_PRICING,
   });
@@ -784,6 +840,7 @@ test("gestisce l'invio SMTP opzionale dalle impostazioni amministrative", async 
     body: JSON.stringify({
       firstName,
       lastName: "Email",
+      comment: "Consegnare nel pomeriggio.",
       items: [{ type: "catalog", productId: 2, colorId: 4, quantity: 1 }],
     }),
   });
@@ -793,6 +850,7 @@ test("gestisce l'invio SMTP opzionale dalle impostazioni amministrative", async 
   assert.equal(sentEmails.length, 1);
   assert.equal(sentEmails[0].subject, `Nuova richiesta ${sentCode}`);
   assert.match(sentEmails[0].text, /Nome: Invio/);
+  assert.match(sentEmails[0].text, /Commento: Consegnare nel pomeriggio\./);
   assert.match(sentEmails[0].text, /Dock Controller/);
 
   rejectEmails = true;
@@ -1038,19 +1096,19 @@ test("gestisce il cambio delle credenziali amministrative", async () => {
     headers: { "content-type": "application/json", cookie: sessionCookie },
     body: JSON.stringify(body),
   });
-  const loginAdmin = (username, password) => fetch(`${baseUrl}/api/admin/login`, {
+  const loginAdmin = (email, password) => fetch(`${baseUrl}/api/admin/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ email, password }),
   });
 
   const wrongPassword = await putCredentials({ currentPassword: "password-sbagliata", password: "nuova-password-1" });
   assert.equal(wrongPassword.status, 401);
   assert.equal((await wrongPassword.json()).error.code, "INVALID_CREDENTIALS");
 
-  const invalidUsername = await putCredentials({ currentPassword: "test-admin-password", username: "NO!" });
-  assert.equal(invalidUsername.status, 400);
-  assert.equal((await invalidUsername.json()).error.code, "INVALID_USERNAME");
+  const invalidEmail = await putCredentials({ currentPassword: "test-admin-password", email: "NO!" });
+  assert.equal(invalidEmail.status, 400);
+  assert.equal((await invalidEmail.json()).error.code, "INVALID_EMAIL");
 
   const shortPassword = await putCredentials({ currentPassword: "test-admin-password", password: "corta" });
   assert.equal(shortPassword.status, 400);
@@ -1061,46 +1119,39 @@ test("gestisce il cambio delle credenziali amministrative", async () => {
   assert.equal((await noChanges.json()).error.code, "INVALID_CREDENTIALS_UPDATE");
 
   database.prepare(`
-    INSERT INTO user_accounts (username, password_hash, first_name, last_name)
-    VALUES ('cliente-esistente', 'hash-fittizio', 'Carlo', 'Rossi')
+    INSERT INTO user_accounts (username, password_hash, first_name, last_name, email)
+    VALUES ('cliente.esistente@example.test', 'hash-fittizio', 'Carlo', 'Rossi', 'cliente.esistente@example.test')
   `).run();
-  const conflict = await putCredentials({ currentPassword: "test-admin-password", username: "cliente-esistente" });
+  const conflict = await putCredentials({ currentPassword: "test-admin-password", email: "cliente.esistente@example.test" });
   assert.equal(conflict.status, 409);
-  assert.equal((await conflict.json()).error.code, "USERNAME_UNAVAILABLE");
+  assert.equal((await conflict.json()).error.code, "EMAIL_UNAVAILABLE");
 
   const changed = await putCredentials({
     currentPassword: "test-admin-password",
-    username: "nuovo-admin",
+    email: "nuovo.admin@example.test",
     password: "nuova-password-segreta",
   });
   assert.equal(changed.status, 200);
-  assert.equal((await changed.json()).data.username, "nuovo-admin");
+  assert.equal((await changed.json()).data.email, "nuovo.admin@example.test");
 
   const staleSession = await fetch(`${baseUrl}/api/admin/settings`, { headers: { cookie } });
   assert.equal(staleSession.status, 401);
-  assert.equal((await loginAdmin("test-admin", "test-admin-password")).status, 401);
+  assert.equal((await loginAdmin("admin@example.test", "test-admin-password")).status, 401);
 
-  const newLogin = await loginAdmin("nuovo-admin", "nuova-password-segreta");
+  const newLogin = await loginAdmin("nuovo.admin@example.test", "nuova-password-segreta");
   assert.equal(newLogin.status, 201);
   const newCookie = newLogin.headers.get("set-cookie").split(";", 1)[0];
   const settings = (await (await fetch(`${baseUrl}/api/admin/settings`, { headers: { cookie: newCookie } })).json()).data;
-  assert.equal(settings.adminUsername, "nuovo-admin");
+  assert.equal(settings.adminEmail, "nuovo.admin@example.test");
   assert.equal(settings.adminCredentialsCustomized, true);
 
-  const reserved = await fetch(`${baseUrl}/api/account/register`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ username: "nuovo-admin", password: "password-cliente", firstName: "Anna", lastName: "Bianchi" }),
-  });
-  assert.equal(reserved.status, 409);
-
-  const freshAuth = createAuthService({ database, adminUsername: "test-admin", adminPassword: "test-admin-password" });
+  const freshAuth = createAuthService({ database, adminEmail: "admin@example.test", adminPassword: "test-admin-password" });
   freshAuth.resetAdminCredentials();
   const overrideRow = database.prepare("SELECT admin_username, admin_password_hash FROM app_settings WHERE id = 1").get();
   assert.equal(overrideRow.admin_username, null);
   assert.equal(overrideRow.admin_password_hash, null);
-  assert.equal((await loginAdmin("test-admin", "test-admin-password")).status, 201);
-  database.prepare("DELETE FROM user_accounts WHERE username = 'cliente-esistente'").run();
+  assert.equal((await loginAdmin("admin@example.test", "test-admin-password")).status, 201);
+  database.prepare("DELETE FROM user_accounts WHERE username = 'cliente.esistente@example.test'").run();
 });
 
 test("espone pubblicamente soltanto codice e stato in ordine recente", async () => {
@@ -1138,6 +1189,13 @@ test("rifiuta richieste manipolate senza creare record", async () => {
       lastName: "Rossi",
       items: [{ type: "catalog", productId: 1, colorId: 1, quantity: 1 }],
       expectedCode: "INVALID_CUSTOMER",
+    },
+    {
+      firstName: "Mauro",
+      lastName: "Rossi",
+      comment: "x".repeat(501),
+      items: [{ type: "catalog", productId: 1, colorId: 1, quantity: 1 }],
+      expectedCode: "INVALID_ORDER_COMMENT",
     },
     {
       firstName: "Mauro",
@@ -1360,33 +1418,80 @@ test("accetta un modello 3MF per i prodotti del catalogo", async () => {
 test("gestisce account, storico personale e accesso amministrativo unificato", async () => {
   assert.equal((await fetch(`${baseUrl}/api/account/orders`)).status, 401);
 
-  const reservedRegistration = await fetch(`${baseUrl}/api/account/register`, {
+  const missingEmailRegistration = await fetch(`${baseUrl}/api/account/register`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      username: "test-admin",
       password: "password-molto-sicura",
       firstName: "Admin",
       lastName: "Cliente",
     }),
   });
-  assert.equal(reservedRegistration.status, 409);
+  assert.equal(missingEmailRegistration.status, 400);
+  assert.equal((await missingEmailRegistration.json()).error.code, "INVALID_EMAIL");
+
+  const reservedAdminEmailRegistration = await fetch(`${baseUrl}/api/account/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      password: "password-molto-sicura",
+      firstName: "Falso",
+      lastName: "Admin",
+      email: "ADMIN@example.test",
+    }),
+  });
+  assert.equal(reservedAdminEmailRegistration.status, 409);
+  assert.equal((await reservedAdminEmailRegistration.json()).error.code, "EMAIL_UNAVAILABLE");
+
+  const invalidEmailRegistration = await fetch(`${baseUrl}/api/account/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      password: "password-molto-sicura",
+      firstName: "Email",
+      lastName: "Non valida",
+      email: "primo@example.test,secondo@example.test",
+    }),
+  });
+  assert.equal(invalidEmailRegistration.status, 400);
+  assert.equal((await invalidEmailRegistration.json()).error.code, "INVALID_EMAIL");
 
   const registration = await fetch(`${baseUrl}/api/account/register`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      username: "cliente.test",
       password: "password-molto-sicura",
       firstName: "Cliente",
       lastName: "Test",
+      email: "Cliente@Example.Test",
     }),
   });
   const registeredAccount = await registration.json();
   const accountCookie = registration.headers.get("set-cookie").split(";", 1)[0];
   assert.equal(registration.status, 201);
   assert.equal(registeredAccount.data.role, "customer");
-  assert.equal(database.prepare("SELECT password_hash FROM user_accounts WHERE username = ?").get("cliente.test").password_hash.includes("password-molto-sicura"), false);
+  assert.equal(registeredAccount.data.email, "cliente@example.test");
+  assert.equal(registeredAccount.data.username, "cliente@example.test");
+  assert.equal(registeredAccount.data.emailNotificationsEnabled, true);
+  assert.equal(registeredAccount.data.emailVerified, false);
+  const firstVerificationEmail = sentEmails.at(-1);
+  assert.equal(firstVerificationEmail.to, "cliente@example.test");
+  assert.match(firstVerificationEmail.subject, /Verifica/);
+  const firstVerificationCode = firstVerificationEmail.text.match(/[A-F0-9]{16}/)?.[0];
+  assert.ok(firstVerificationCode);
+  const duplicateEmailRegistration = await fetch(`${baseUrl}/api/account/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      password: "altra-password-molto-sicura",
+      firstName: "Cliente",
+      lastName: "Duplicato",
+      email: "CLIENTE@example.test",
+    }),
+  });
+  assert.equal(duplicateEmailRegistration.status, 409);
+  assert.equal((await duplicateEmailRegistration.json()).error.code, "EMAIL_UNAVAILABLE");
+  assert.equal(database.prepare("SELECT password_hash FROM user_accounts WHERE username = ?").get("cliente@example.test").password_hash.includes("password-molto-sicura"), false);
 
   const accountFetch = (pathName, options = {}) =>
     fetch(`${baseUrl}${pathName}`, {
@@ -1395,7 +1500,10 @@ test("gestisce account, storico personale e accesso amministrativo unificato", a
     });
   const session = await accountFetch("/api/account/session");
   assert.equal(session.status, 200);
-  assert.equal((await session.json()).data.username, "cliente.test");
+  const sessionAccount = (await session.json()).data;
+  assert.equal(sessionAccount.username, "cliente@example.test");
+  assert.equal(sessionAccount.email, "cliente@example.test");
+  assert.equal(sessionAccount.emailVerified, false);
   assert.equal((await accountFetch("/api/admin/session")).status, 403);
 
   const orderResponse = await accountFetch("/api/orders", {
@@ -1404,6 +1512,7 @@ test("gestisce account, storico personale e accesso amministrativo unificato", a
     body: JSON.stringify({
       firstName: "Cliente",
       lastName: "Test",
+      comment: "Lasciare il supporto attaccato.",
       items: [{ type: "catalog", productId: 1, colorId: 1, quantity: 2 }],
     }),
   });
@@ -1417,6 +1526,7 @@ test("gestisce account, storico personale e accesso amministrativo unificato", a
   assert.equal(historyResponse.status, 200);
   assert.equal(history.length, 1);
   assert.equal(history[0].code, order.code);
+  assert.equal(history[0].comment, "Lasciare il supporto attaccato.");
   assert.equal(history[0].totalPriceCents, 2400);
   assert.equal(history[0].priceStatus, "confirmed");
   assert.equal(history[0].items[0].productName, "Vaso Orbitale");
@@ -1458,6 +1568,102 @@ test("gestisce account, storico personale e accesso amministrativo unificato", a
   assert.equal(estimatedCustom.items[0].estimatedQuote.unitPriceCents, 500);
 
   const adminCookieForQuote = await authenticateAdmin();
+  const notificationCountBeforeVerification = sentEmails.length;
+  const unverifiedInProgressResponse = await fetch(`${baseUrl}/api/admin/orders/${savedOrder.id}/status`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", cookie: adminCookieForQuote },
+    body: JSON.stringify({ status: "in_lavorazione" }),
+  });
+  assert.equal(unverifiedInProgressResponse.status, 200);
+  assert.equal(sentEmails.length, notificationCountBeforeVerification);
+  await fetch(`${baseUrl}/api/admin/orders/${savedOrder.id}/status`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", cookie: adminCookieForQuote },
+    body: JSON.stringify({ status: "in_attesa" }),
+  });
+
+  const resendVerification = await accountFetch("/api/account/email/resend", { method: "POST" });
+  assert.equal(resendVerification.status, 204);
+  const resentVerificationCode = sentEmails.at(-1).text.match(/[A-F0-9]{16}/)?.[0];
+  assert.ok(resentVerificationCode);
+  assert.notEqual(resentVerificationCode, firstVerificationCode);
+  const staleVerification = await accountFetch("/api/account/email/verify", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ code: firstVerificationCode }),
+  });
+  assert.equal(staleVerification.status, 400);
+  assert.equal((await staleVerification.json()).error.code, "INVALID_EMAIL_CODE");
+  database.prepare("UPDATE email_verification_tokens SET expires_at = 0 WHERE user_account_id = ?").run(registeredAccount.data.id);
+  const expiredVerification = await accountFetch("/api/account/email/verify", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ code: resentVerificationCode }),
+  });
+  assert.equal(expiredVerification.status, 410);
+  assert.equal((await expiredVerification.json()).error.code, "EMAIL_CODE_EXPIRED");
+  assert.equal((await accountFetch("/api/account/email/resend", { method: "POST" })).status, 204);
+  const validVerificationCode = sentEmails.at(-1).text.match(/[A-F0-9]{16}/)?.[0];
+  const validVerification = await accountFetch("/api/account/email/verify", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ code: validVerificationCode.toLowerCase() }),
+  });
+  assert.equal(validVerification.status, 200);
+  assert.equal((await validVerification.json()).data.emailVerified, true);
+  assert.ok(database.prepare("SELECT email_verified_at FROM user_accounts WHERE id = ?").get(registeredAccount.data.id).email_verified_at);
+
+  const invalidPreference = await accountFetch("/api/account/preferences", {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ emailNotificationsEnabled: "false" }),
+  });
+  assert.equal(invalidPreference.status, 400);
+  assert.equal((await invalidPreference.json()).error.code, "INVALID_EMAIL_PREFERENCE");
+  const disableNotifications = await accountFetch("/api/account/preferences", {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ emailNotificationsEnabled: false }),
+  });
+  assert.equal(disableNotifications.status, 200);
+  assert.equal((await disableNotifications.json()).data.emailNotificationsEnabled, false);
+  const disabledNotificationCount = sentEmails.length;
+  await fetch(`${baseUrl}/api/admin/orders/${savedOrder.id}/status`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", cookie: adminCookieForQuote },
+    body: JSON.stringify({ status: "in_lavorazione" }),
+  });
+  assert.equal(sentEmails.length, disabledNotificationCount);
+  await fetch(`${baseUrl}/api/admin/orders/${savedOrder.id}/status`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", cookie: adminCookieForQuote },
+    body: JSON.stringify({ status: "in_attesa" }),
+  });
+  const enableNotifications = await accountFetch("/api/account/preferences", {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ emailNotificationsEnabled: true }),
+  });
+  assert.equal(enableNotifications.status, 200);
+  assert.equal((await enableNotifications.json()).data.emailNotificationsEnabled, true);
+
+  const notificationCount = sentEmails.length;
+  const inProgressResponse = await fetch(`${baseUrl}/api/admin/orders/${savedOrder.id}/status`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", cookie: adminCookieForQuote },
+    body: JSON.stringify({ status: "in_lavorazione" }),
+  });
+  assert.equal(inProgressResponse.status, 200);
+  assert.equal(sentEmails.length, notificationCount + 1);
+  assert.equal(sentEmails.at(-1).to, "cliente@example.test");
+  assert.match(sentEmails.at(-1).subject, new RegExp(savedOrder.code));
+  const repeatedStatusResponse = await fetch(`${baseUrl}/api/admin/orders/${savedOrder.id}/status`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", cookie: adminCookieForQuote },
+    body: JSON.stringify({ status: "in_lavorazione" }),
+  });
+  assert.equal(repeatedStatusResponse.status, 200);
+  assert.equal(sentEmails.length, notificationCount + 1);
   const confirmedQuoteResponse = await fetch(`${baseUrl}/api/admin/orders/${savedCustomOrder.id}/items/${savedCustomItem.id}/actual-quote`, {
     method: "PATCH",
     headers: { "content-type": "application/json", cookie: adminCookieForQuote },
@@ -1537,7 +1743,7 @@ test("gestisce account, storico personale e accesso amministrativo unificato", a
   const login = await fetch(`${baseUrl}/api/account/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ username: "cliente.test", password: "password-molto-sicura" }),
+    body: JSON.stringify({ email: "cliente@example.test", password: "password-molto-sicura" }),
   });
   assert.equal(login.status, 201);
   assert.equal((await login.json()).data.role, "customer");
@@ -1546,27 +1752,30 @@ test("gestisce account, storico personale e accesso amministrativo unificato", a
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      username: "altro.cliente",
       password: "seconda-password-sicura",
       firstName: "Altro",
       lastName: "Cliente",
+      email: "altro@example.test",
     }),
   });
   const secondAccount = await secondRegistration.json();
   const secondCookie = secondRegistration.headers.get("set-cookie").split(";", 1)[0];
   assert.equal(secondRegistration.status, 201);
+  assert.equal(secondAccount.data.email, "altro@example.test");
   const secondHistory = await fetch(`${baseUrl}/api/account/orders`, { headers: { cookie: secondCookie } });
   assert.deepEqual((await secondHistory.json()).data, []);
 
   const adminLogin = await fetch(`${baseUrl}/api/account/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ username: "test-admin", password: "test-admin-password" }),
+    body: JSON.stringify({ email: "admin@example.test", password: "test-admin-password" }),
   });
   const adminAccount = await adminLogin.json();
   const adminCookie = adminLogin.headers.get("set-cookie").split(";", 1)[0];
   assert.equal(adminLogin.status, 201);
   assert.equal(adminAccount.data.role, "admin");
+  assert.equal(adminAccount.data.email, "admin@example.test");
+  assert.equal(adminAccount.data.emailVerified, true);
   assert.equal((await fetch(`${baseUrl}/api/admin/session`, { headers: { cookie: adminCookie } })).status, 200);
   await fetch(`${baseUrl}/api/account/logout`, { method: "POST", headers: { cookie: adminCookie } });
 
@@ -1587,22 +1796,22 @@ test("protegge le API amministrative e gestisce il ciclo completo di un ordine",
   const wrongLogin = await fetch(`${baseUrl}/api/admin/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ username: "test-admin", password: "errata" }),
+    body: JSON.stringify({ email: "admin@example.test", password: "errata" }),
   });
   assert.equal(wrongLogin.status, 401);
 
-  const wrongUsername = await fetch(`${baseUrl}/api/admin/login`, {
+  const wrongEmail = await fetch(`${baseUrl}/api/admin/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ username: "altro-admin", password: "test-admin-password" }),
+    body: JSON.stringify({ email: "altro.admin@example.test", password: "test-admin-password" }),
   });
-  assert.equal(wrongUsername.status, 401);
-  assert.equal((await wrongUsername.json()).error.code, "INVALID_ADMIN_CREDENTIALS");
+  assert.equal(wrongEmail.status, 401);
+  assert.equal((await wrongEmail.json()).error.code, "INVALID_ADMIN_CREDENTIALS");
 
   const login = await fetch(`${baseUrl}/api/admin/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ username: "test-admin", password: "test-admin-password" }),
+    body: JSON.stringify({ email: "admin@example.test", password: "test-admin-password" }),
   });
   const setCookie = login.headers.get("set-cookie");
   const cookie = setCookie.split(";", 1)[0];
@@ -1703,7 +1912,7 @@ test("applica un unico rate limit concorrente alle credenziali amministrative", 
     uploadDirectory: tempUploadDirectory,
     orderFileDirectory: tempOrderFileDirectory,
     catalogDirectory: tempCatalogDirectory,
-    adminUsername: "test-admin",
+    adminEmail: "admin@example.test",
     adminPassword: "test-admin-password",
     emailService: tempEmailService,
     uploadRateLimit: false,
@@ -1718,7 +1927,7 @@ test("applica un unico rate limit concorrente alle credenziali amministrative", 
         fetch(`${tempUrl}${index % 2 === 0 ? "/api/account/login" : "/api/admin/login"}`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ username: "test-admin", password: `errata-${index}` }),
+          body: JSON.stringify({ email: "admin@example.test", password: `errata-${index}` }),
         })
       ),
     );
@@ -1760,18 +1969,18 @@ test("permette all'amministratore di eliminare tutti gli ordini", async () => {
 });
 
 test("permette all'utente di eliminare un proprio ordine ma non quelli altrui", async () => {
-  const register = (username) => fetch(`${baseUrl}/api/account/register`, {
+  const register = (email) => fetch(`${baseUrl}/api/account/register`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      username,
+      email,
       password: "password-molto-sicura",
       firstName: "Elimina",
       lastName: "Test",
     }),
   });
 
-  const firstRegistration = await register("utente.elimina");
+  const firstRegistration = await register("utente.elimina@example.test");
   assert.equal(firstRegistration.status, 201);
   const firstCookie = firstRegistration.headers.get("set-cookie").split(";", 1)[0];
   const firstFetch = (pathName, options = {}) => fetch(`${baseUrl}${pathName}`, {
@@ -1791,7 +2000,7 @@ test("permette all'utente di eliminare un proprio ordine ma non quelli altrui", 
   const order = (await orderResponse.json()).data;
   assert.equal(orderResponse.status, 201);
 
-  const secondRegistration = await register("altro.elimina");
+  const secondRegistration = await register("altro.elimina@example.test");
   assert.equal(secondRegistration.status, 201);
   const secondCookie = secondRegistration.headers.get("set-cookie").split(";", 1)[0];
   const otherDelete = await fetch(`${baseUrl}/api/account/orders/${encodeURIComponent(order.code)}`, {

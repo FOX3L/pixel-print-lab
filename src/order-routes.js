@@ -25,6 +25,7 @@ export const defaultOrderFileDirectory = path.join(currentDirectory, "..", "stor
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_ORDER_ITEMS = 100;
 const MAX_OPEN_ORDERS = 15;
+const MAX_ORDER_COMMENT_LENGTH = 500;
 export const ORDER_STATUSES = new Set(["in_attesa", "in_lavorazione", "completato", "consegnato"]);
 
 class OrderError extends Error {
@@ -69,6 +70,25 @@ export function validateQuantity(value) {
   return value;
 }
 
+export function validateOrderComment(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string") {
+    throw new OrderError("INVALID_ORDER_COMMENT", "Il commento non e valido.");
+  }
+  const normalized = value.replace(/\r\n?/g, "\n").trim();
+  if (!normalized) return null;
+  if (
+    normalized.length > MAX_ORDER_COMMENT_LENGTH ||
+    /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(normalized)
+  ) {
+    throw new OrderError(
+      "INVALID_ORDER_COMMENT",
+      `Il commento puo contenere al massimo ${MAX_ORDER_COMMENT_LENGTH} caratteri.`,
+    );
+  }
+  return normalized;
+}
+
 function createOrderCode(database, firstName, lastName) {
   const initialFirst = (firstName?.trim()?.[0] ?? "X").toUpperCase();
   const initialLast = (lastName?.trim()?.[0] ?? "X").toUpperCase();
@@ -86,14 +106,14 @@ function formatEuro(cents) {
   return `${(cents / 100).toFixed(2).replace(".", ",")} EUR`;
 }
 
-export function buildEmail({ code, firstName, lastName, items, catalogTotalCents }) {
+export function buildEmail({ code, firstName, lastName, comment, items, catalogTotalCents }) {
   const lines = [
     `Codice: ${code}`,
     `Nome: ${firstName}`,
     `Cognome: ${lastName}`,
-    "",
-    "Dettagli:",
   ];
+  if (comment) lines.push(`Commento: ${comment}`);
+  lines.push("", "Dettagli:");
 
   items.forEach((item, index) => {
     lines.push(`${index + 1}. ${item.productName}`);
@@ -158,8 +178,8 @@ export function registerOrderRoutes(
     SELECT COUNT(*) AS count FROM orders WHERE status NOT IN ('completato', 'consegnato')
   `);
   const insertOrder = database.prepare(`
-    INSERT INTO orders (code, first_name, last_name, catalog_total_cents, user_account_id)
-    VALUES (@code, @firstName, @lastName, @catalogTotalCents, @userAccountId)
+    INSERT INTO orders (code, first_name, last_name, comment, catalog_total_cents, user_account_id)
+    VALUES (@code, @firstName, @lastName, @comment, @catalogTotalCents, @userAccountId)
   `);
   const insertItem = database.prepare(`
     INSERT INTO order_items (
@@ -191,6 +211,7 @@ export function registerOrderRoutes(
     try {
       const firstName = validatePersonName(request.body?.firstName, "Il nome");
       const lastName = validatePersonName(request.body?.lastName, "Il cognome");
+      const comment = validateOrderComment(request.body?.comment);
       if (
         !Array.isArray(request.body?.items) ||
         request.body.items.length < 1 ||
@@ -379,6 +400,7 @@ export function registerOrderRoutes(
         code,
         firstName,
         lastName,
+        comment,
         catalogTotalCents,
         userAccountId: request.userAccount?.id ?? null,
         items: validatedItems,

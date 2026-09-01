@@ -44,9 +44,10 @@ export function createEmailService(
   return Object.freeze({
     configured,
     recipient,
-    async sendOrderEmail({ subject, text }) {
+    async sendOrderEmail({ to = recipient, subject, text }) {
       if (!transport) throw new Error("SMTP non configurato.");
-      await transport.sendMail({ from, to: recipient, subject, text });
+      if (!to) throw new Error("Destinatario email non configurato.");
+      await transport.sendMail({ from, to, subject, text });
     },
   });
 }

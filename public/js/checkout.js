@@ -41,6 +41,9 @@ export function initCheckout({ onOrderCreated, onSessionExpired } = {}) {
   const checkoutSubmitButton = document.querySelector("#checkout-submit");
   const orderConfirmation = document.querySelector("#order-confirmation");
   const confirmationCode = document.querySelector("#confirmation-code");
+  const guestOrderDialog = document.querySelector("#guest-order-dialog");
+  const guestOrderContinueButton = document.querySelector("#guest-order-continue");
+  const guestOrderAccountButton = document.querySelector("#guest-order-account");
 
   checkoutOpenButton.addEventListener("click", () => {
     checkoutForm.reset();
@@ -68,8 +71,7 @@ export function initCheckout({ onOrderCreated, onSessionExpired } = {}) {
     checkoutDialog.close();
   });
 
-  checkoutForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
+  async function submitOrder() {
     const formData = new FormData(checkoutForm);
     checkoutSubmitButton.disabled = true;
     checkoutSubmitButton.textContent = "Invio in corso...";
@@ -83,6 +85,7 @@ export function initCheckout({ onOrderCreated, onSessionExpired } = {}) {
         body: JSON.stringify({
           firstName: formData.get("firstName"),
           lastName: formData.get("lastName"),
+          comment: formData.get("comment"),
           items: state.cart.map(serializeOrderItem),
         }),
       });
@@ -101,5 +104,26 @@ export function initCheckout({ onOrderCreated, onSessionExpired } = {}) {
       checkoutSubmitButton.disabled = false;
       checkoutSubmitButton.textContent = "Conferma e invia";
     }
+  }
+
+  checkoutForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!state.currentAccount) {
+      guestOrderDialog.showModal();
+      guestOrderContinueButton.focus();
+      return;
+    }
+    submitOrder();
+  });
+
+  guestOrderContinueButton.addEventListener("click", () => {
+    guestOrderDialog.close();
+    submitOrder();
+  });
+
+  guestOrderAccountButton.addEventListener("click", () => {
+    guestOrderDialog.close();
+    checkoutDialog.close();
+    document.querySelector("#account-open").click();
   });
 }

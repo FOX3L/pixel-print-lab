@@ -437,7 +437,8 @@
   text-transform: uppercase;
 }
 
-.checkout-form input {
+.checkout-form input,
+.checkout-form textarea {
   width: 100%;
   min-height: 3rem;
   padding: 0.7rem;
@@ -447,7 +448,23 @@
   font-weight: 700;
 }
 
-.checkout-form input:focus {
+.checkout-form textarea {
+  min-height: 6.5rem;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.checkout-form__comment {
+  grid-column: 1 / -1;
+}
+
+.checkout-form__comment small {
+  font-size: inherit;
+  font-weight: 400;
+}
+
+.checkout-form input:focus,
+.checkout-form textarea:focus {
   outline: 3px solid var(--green);
   outline-offset: 2px;
 }
@@ -501,6 +518,78 @@
 
 .order-confirmation .pixel-button {
   width: 100%;
+}
+
+.guest-order-dialog {
+  width: min(calc(100% - 2rem), 34rem);
+  margin: auto;
+  padding: 0;
+  color: var(--ink);
+  background: var(--paper);
+  border: var(--line);
+  box-shadow: 10px 10px 0 var(--orange);
+}
+
+.guest-order-dialog::backdrop {
+  background: rgba(23, 32, 26, 0.84);
+}
+
+.guest-order-dialog__content {
+  padding: clamp(1.25rem, 4vw, 2rem);
+}
+
+.guest-order-dialog h2 {
+  margin: 0.5rem 0 1rem;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: clamp(1.8rem, 6vw, 3rem);
+  line-height: 0.94;
+  letter-spacing: -0.055em;
+}
+
+.guest-order-dialog p:not(.section-number) {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.guest-order-dialog ul {
+  margin: 1.25rem 0;
+  padding: 1rem 1rem 1rem 2.25rem;
+  background: var(--panel);
+  border: 2px dashed var(--ink);
+  font-size: 0.75rem;
+  line-height: 1.8;
+}
+
+.guest-order-dialog__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.guest-order-dialog__actions button {
+  min-height: 3rem;
+  padding: 0.75rem;
+  color: var(--ink);
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--blue);
+  font-family: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.guest-order-dialog__actions button:last-child {
+  color: var(--paper);
+  background: var(--ink);
+  box-shadow: 4px 4px 0 var(--orange);
+}
+
+.guest-order-dialog__actions button:hover,
+.guest-order-dialog__actions button:focus-visible {
+  color: var(--ink);
+  background: var(--orange);
+  outline: none;
 }
 
 .account-dialog {
@@ -592,6 +681,11 @@
   text-transform: uppercase;
 }
 
+.account-form label small {
+  font-size: inherit;
+  font-weight: 400;
+}
+
 .account-form input {
   width: 100%;
   min-height: 2.8rem;
@@ -660,6 +754,21 @@
   margin: 0.4rem 0 0;
 }
 
+.account-notification-toggle {
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.account-notification-toggle input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--orange);
+}
+
 .account-profile__actions {
   display: flex;
   gap: 0.75rem;
@@ -674,6 +783,53 @@
   align-items: center;
   color: var(--ink);
   background: var(--orange);
+}
+
+.account-email-verification {
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  border: 3px solid var(--ink);
+  background: var(--panel);
+  box-shadow: 6px 6px 0 var(--orange);
+}
+
+.account-email-verification h3,
+.account-email-verification p {
+  margin: 0 0 0.75rem;
+}
+
+.account-email-verification form {
+  display: flex;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.account-email-verification label {
+  flex: 1;
+}
+
+.account-email-verification label span {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.account-email-verification input,
+.account-email-verification button {
+  min-height: 2.8rem;
+  padding: 0.65rem;
+  border: 3px solid var(--ink);
+}
+
+.account-email-verification button {
+  color: var(--paper);
+  background: var(--ink);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .account-orders {
@@ -785,6 +941,17 @@
 .account-order li span:last-child {
   color: var(--muted);
   text-align: right;
+}
+
+.account-order__comment {
+  margin: 0.8rem 0 0;
+  padding: 0.75rem;
+  color: var(--ink);
+  background: var(--paper);
+  border-left: 4px solid var(--orange);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
 }
 
 .viewer-plate-size {

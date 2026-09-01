@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.9.0] - 2026-09-01
+
+### Added
+
+- Account cliente con email obbligatoria, storico personale degli ordini e dati anagrafici riutilizzati al checkout.
+- Verifica email tramite codice monouso con scadenza, reinvio protetto e notifiche abilitate soltanto dopo la conferma.
+- Preferenza nel profilo per attivare o disattivare gli avvisi email sullo stato degli ordini.
+- Commento facoltativo nelle richieste, visibile nello storico cliente, nelle email e nella Control Room.
+- Conferma dedicata agli ospiti prima dell'invio dell'ordine, con accesso rapido a login e registrazione.
+
+### Changed
+
+- L'email e l'unica credenziale degli account cliente; l'amministratore usa `ADMIN_EMAIL` e `ADMIN_PASSWORD` configurati tramite Docker Compose ed e considerato gia verificato.
+- La transizione di un ordine a "in lavorazione" invia un solo avviso al cliente quando email e preferenza notifiche risultano attive.
+- Migliorati i collegamenti contestuali al carrello e a MakerWorld nei flussi del catalogo e dei modelli personali.
+
+### Migration notes
+
+- La migrazione database `20` elimina gli account cliente precedenti e scollega i relativi ordini, che restano conservati come ordini ospite.
+
 ## [1.8.1] - 2026-09-01
 
 ### Fixed

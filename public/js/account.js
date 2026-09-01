@@ -18,6 +18,14 @@ export function initAccount() {
   const accountGuestFeedback = document.querySelector("#account-guest-feedback");
   const accountDisplayName = document.querySelector("#account-display-name");
   const accountUsername = document.querySelector("#account-username");
+  const accountEmail = document.querySelector("#account-email");
+  const accountNotificationToggle = document.querySelector("#account-notification-toggle");
+  const accountEmailNotifications = document.querySelector("#account-email-notifications");
+  const accountPreferencesFeedback = document.querySelector("#account-preferences-feedback");
+  const accountEmailVerification = document.querySelector("#account-email-verification");
+  const accountEmailVerificationForm = document.querySelector("#account-email-verification-form");
+  const accountEmailResend = document.querySelector("#account-email-resend");
+  const accountEmailFeedback = document.querySelector("#account-email-feedback");
   const accountAdminLink = document.querySelector("#account-admin-link");
   const accountLogoutButton = document.querySelector("#account-logout");
   const accountOrdersRefresh = document.querySelector("#account-orders-refresh");
@@ -28,21 +36,33 @@ export function initAccount() {
 
   let accountStateVersion = 0;
   let accountAuthPending = false;
-
   function renderAccount() {
     const authenticated = Boolean(state.currentAccount);
     accountGuestView.hidden = authenticated;
     accountUserView.hidden = !authenticated;
-    accountOpenButton.textContent = authenticated ? `@${state.currentAccount.username}` : "Accedi";
+    accountOpenButton.textContent = authenticated ? state.currentAccount.firstName : "Accedi";
     checkoutCustomerNote.textContent = authenticated
-      ? `La richiesta verra salvata nello storico di @${state.currentAccount.username}.`
+      ? "La richiesta verra salvata nel tuo storico personale."
       : "Puoi inviare la richiesta come ospite. Accordi e consegna avverranno privatamente.";
     if (!authenticated) {
       accountOrderList.replaceChildren();
       return;
     }
     accountDisplayName.textContent = `${state.currentAccount.firstName} ${state.currentAccount.lastName}`;
-    accountUsername.textContent = `@${state.currentAccount.username}`;
+    accountUsername.textContent = state.currentAccount.email;
+    accountEmail.hidden = !state.currentAccount.email;
+    accountEmail.textContent = state.currentAccount.role === "admin"
+      ? "Email amministrativa verificata"
+      : state.currentAccount.email
+        ? `${!state.currentAccount.emailVerified
+          ? "Email da verificare"
+          : state.currentAccount.emailNotificationsEnabled
+            ? "Notifiche attive"
+            : "Notifiche disattivate"}`
+        : "";
+    accountNotificationToggle.hidden = !state.currentAccount.email || state.currentAccount.role === "admin";
+    accountEmailNotifications.checked = state.currentAccount.emailNotificationsEnabled;
+    accountEmailVerification.hidden = !state.currentAccount.email || state.currentAccount.emailVerified;
     accountAdminLink.hidden = state.currentAccount.role !== "admin";
   }
 
@@ -57,6 +77,9 @@ export function initAccount() {
       element.querySelector('[data-field="account-order-status"]').textContent = publicStatusLabels[order.status] ?? order.status;
       element.querySelector('[data-field="account-order-total-label"]').textContent = priceStatusLabel(order.priceStatus);
       element.querySelector('[data-field="account-order-total"]').textContent = euroFormatter.format((order.totalPriceCents ?? order.catalogTotalCents) / 100);
+      const comment = element.querySelector('[data-field="account-order-comment"]');
+      comment.hidden = !order.comment;
+      comment.textContent = order.comment ? `Commento: ${order.comment}` : "";
       const deleteButton = element.querySelector('[data-field="account-order-delete"]');
       deleteButton.addEventListener("click", () => deleteAccountOrder(order.code));
       const itemList = element.querySelector('[data-field="account-order-items"]');
@@ -174,7 +197,7 @@ export function initAccount() {
     accountGuestFeedback.textContent = "";
     accountDialogBackdrop.hidden = false;
     accountDialog.show();
-    if (!accountGuestView.hidden) document.querySelector("#login-username").focus();
+    if (!accountGuestView.hidden) document.querySelector("#login-email").focus();
     if (state.currentAccount) loadAccountOrders();
   });
   accountDialog.addEventListener("close", () => {
@@ -194,6 +217,61 @@ export function initAccount() {
     event.preventDefault();
     submitAccountForm(accountRegisterForm, "/api/account/register");
   });
+  accountEmailVerificationForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submitButton = accountEmailVerificationForm.querySelector('[type="submit"]');
+    submitButton.disabled = true;
+    accountEmailFeedback.textContent = "Verifica in corso...";
+    accountEmailFeedback.classList.remove("account-feedback--error");
+    try {
+      state.currentAccount = await api("/api/account/email/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(new FormData(accountEmailVerificationForm))),
+      });
+      accountEmailVerificationForm.reset();
+      renderAccount();
+    } catch (error) {
+      accountEmailFeedback.textContent = error.message;
+      accountEmailFeedback.classList.add("account-feedback--error");
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
+  accountEmailResend.addEventListener("click", async () => {
+    accountEmailResend.disabled = true;
+    accountEmailFeedback.textContent = "Invio in corso...";
+    accountEmailFeedback.classList.remove("account-feedback--error");
+    try {
+      await api("/api/account/email/resend", { method: "POST" });
+      accountEmailFeedback.textContent = "Nuovo codice inviato. Controlla anche la cartella spam.";
+    } catch (error) {
+      accountEmailFeedback.textContent = error.message;
+      accountEmailFeedback.classList.add("account-feedback--error");
+    } finally {
+      accountEmailResend.disabled = false;
+    }
+  });
+  accountEmailNotifications.addEventListener("change", async () => {
+    accountEmailNotifications.disabled = true;
+    accountPreferencesFeedback.textContent = "Salvataggio...";
+    accountPreferencesFeedback.classList.remove("account-feedback--error");
+    try {
+      state.currentAccount = await api("/api/account/preferences", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ emailNotificationsEnabled: accountEmailNotifications.checked }),
+      });
+      renderAccount();
+      accountPreferencesFeedback.textContent = "Preferenza salvata.";
+    } catch (error) {
+      accountEmailNotifications.checked = state.currentAccount.emailNotificationsEnabled;
+      accountPreferencesFeedback.textContent = error.message;
+      accountPreferencesFeedback.classList.add("account-feedback--error");
+    } finally {
+      accountEmailNotifications.disabled = false;
+    }
+  });
   accountLogoutButton.addEventListener("click", async () => {
     accountLogoutButton.disabled = true;
     const version = ++accountStateVersion;
@@ -203,7 +281,7 @@ export function initAccount() {
       if (version !== accountStateVersion) return;
       state.currentAccount = undefined;
       renderAccount();
-      document.querySelector("#login-username").focus();
+      document.querySelector("#login-email").focus();
     } catch (error) {
       if (version === accountStateVersion) accountOrdersStatus.textContent = error.message;
     } finally {

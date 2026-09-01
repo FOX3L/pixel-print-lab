@@ -12,6 +12,18 @@ function setText(element, field, value) {
   element.querySelector(`[data-field="${field}"]`).textContent = value;
 }
 
+export function setCartFeedback(element, prefix, suffix = ".") {
+  const link = document.createElement("a");
+  link.href = "#cart-dialog";
+  link.className = "cart-feedback-link";
+  link.textContent = "carrello";
+  link.addEventListener("click", (event) => {
+    event.preventDefault();
+    document.querySelector("#cart-open").click();
+  });
+  element.replaceChildren(prefix, link, suffix);
+}
+
 export function initCartUI() {
   const cartOpenButton = document.querySelector("#cart-open");
   const cartCount = document.querySelector("#cart-count");

@@ -274,6 +274,14 @@ export function registerAdminRoutes(
   const updateOrderStatus = database.prepare(`
     UPDATE orders SET status = ? WHERE id = ?
   `);
+  const findOrderStatusNotification = database.prepare(`
+    SELECT orders.id, orders.code, orders.status, user_accounts.email AS account_email,
+      user_accounts.email_verified_at AS account_email_verified_at,
+      user_accounts.email_notifications_enabled AS account_email_notifications_enabled
+    FROM orders
+    LEFT JOIN user_accounts ON user_accounts.id = orders.user_account_id
+    WHERE orders.id = ?
+  `);
   const updateItemActualQuote = database.prepare(`
     UPDATE order_items SET
       unit_price_cents = @unitPriceCents,
@@ -295,7 +303,7 @@ export function registerAdminRoutes(
       emailNotificationsEnabled: Boolean(getSettings.get().email_notifications_enabled),
       smtpConfigured: Boolean(emailService?.configured),
       smtpRecipient: emailService?.recipient ?? null,
-      adminUsername: adminAccess.username,
+      adminEmail: adminAccess.email,
       adminCredentialsCustomized: adminAccess.customized,
       pricing: readPricingSettings(database),
     };
@@ -373,7 +381,7 @@ export function registerAdminRoutes(
     try {
       const result = await authService.changeAdminCredentials({
         currentPassword: request.body?.currentPassword,
-        username: request.body?.username,
+        email: request.body?.email,
         password: request.body?.password,
       });
       return response.json({ data: result });
@@ -540,6 +548,7 @@ export function registerAdminRoutes(
         code: order.code,
         firstName: order.first_name,
         lastName: order.last_name,
+        comment: order.comment,
         catalogTotalCents: order.catalog_total_cents,
         status: order.status,
         createdAt: order.created_at,
@@ -548,15 +557,39 @@ export function registerAdminRoutes(
     });
   });
 
-  app.patch("/api/admin/orders/:id/status", requireAdmin, (request, response) => {
+  app.patch("/api/admin/orders/:id/status", requireAdmin, async (request, response) => {
     try {
       if (!/^\d+$/.test(request.params.id)) throw new AdminError("ORDER_NOT_FOUND", "Richiesta non trovata.", 404);
       const id = Number(request.params.id);
       if (!ORDER_STATUSES.has(request.body?.status)) {
         throw new AdminError("INVALID_ORDER_STATUS", "Lo stato della richiesta non e valido.");
       }
-      if (updateOrderStatus.run(request.body.status, id).changes === 0) {
+      const order = findOrderStatusNotification.get(id);
+      if (!order) {
         throw new AdminError("ORDER_NOT_FOUND", "Richiesta non trovata.", 404);
+      }
+      updateOrderStatus.run(request.body.status, id);
+      if (
+        order.status !== "in_lavorazione" &&
+        request.body.status === "in_lavorazione" &&
+        order.account_email &&
+        order.account_email_verified_at &&
+        order.account_email_notifications_enabled
+      ) {
+        try {
+          await emailService?.sendOrderEmail({
+            to: order.account_email,
+            subject: `Il tuo ordine ${order.code} e in lavorazione`,
+            text: [
+              `Il tuo ordine ${order.code} e ora in lavorazione.`,
+              "",
+              "Puoi controllarne lo stato accedendo al tuo account PIX3LLAB.",
+              "",
+            ].join("\n"),
+          });
+        } catch (error) {
+          console.error(`Notifica cliente non inviata per ${order.code}.`, error);
+        }
       }
       return response.json({ data: { id, status: request.body.status } });
     } catch (error) {

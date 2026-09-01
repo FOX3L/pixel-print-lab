@@ -151,6 +151,18 @@
   line-height: 1.5;
 }
 
+.field-hint a {
+  color: var(--blue);
+  font-weight: 700;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 2px;
+}
+
+.field-hint a:hover,
+.field-hint a:focus-visible {
+  color: var(--orange);
+}
+
 .preview-file {
   min-height: 2.5rem;
   padding: 0.55rem 0.75rem;

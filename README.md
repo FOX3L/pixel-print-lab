@@ -58,7 +58,7 @@ npm.cmd run dev
 
 Open `http://localhost:3000`. The admin panel is at `http://localhost:3000/admin.html`.
 
-Set `ADMIN_USERNAME` and `ADMIN_PASSWORD` in the local `.env` file before opening the Control Room.
+Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in the local `.env` file before opening the Control Room.
 
 ## Tests
 
@@ -76,7 +76,7 @@ Copy the example environment file:
 cp .env.example .env
 ```
 
-Edit `.env` and set at least `ADMIN_USERNAME` and `ADMIN_PASSWORD`, then start:
+Edit `.env` and set at least `ADMIN_EMAIL` and `ADMIN_PASSWORD`, then start:
 
 ```sh
 docker compose pull
@@ -92,7 +92,7 @@ The Compose file loads environment variables from `.env` via `env_file`.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `ADMIN_USERNAME` | none | Initial admin username |
+| `ADMIN_EMAIL` | none | Initial admin email, considered verified |
 | `ADMIN_PASSWORD` | none | Initial admin password |
 | `TRUST_PROXY` | `false` | Set to `true` behind a trusted HTTPS reverse proxy |
 | `PORT` | `3000` | Internal container port |

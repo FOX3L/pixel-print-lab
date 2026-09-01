@@ -12,15 +12,15 @@ services:
       - pixel-print-lab-storage:/app/storage
     env_file:
       - .env
+    environment:
+      ADMIN_EMAIL: "${ADMIN_EMAIL:?Set ADMIN_EMAIL in the .env file}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in the .env file}"
 
-    # environment:
     #   PORT: "3000"
     #   DATABASE_PATH: /app/data/pixel-print-lab.db
     #   UPLOAD_DIRECTORY: /app/storage/uploads
     #   ORDER_FILE_DIRECTORY: /app/storage/orders
     #   CATALOG_DIRECTORY: /app/storage/catalog
-    #   ADMIN_USERNAME: admin
-    #   ADMIN_PASSWORD: admin
     #   TRUST_PROXY: "false"
     #   SMTP_HOST: smtp.example.com
     #   SMTP_PORT: "587"

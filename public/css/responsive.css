@@ -496,6 +496,15 @@
     box-shadow: 6px 6px 0 var(--green);
   }
 
+  .guest-order-dialog {
+    width: calc(100% - 1rem);
+    box-shadow: 6px 6px 0 var(--orange);
+  }
+
+  .guest-order-dialog__actions {
+    grid-template-columns: 1fr;
+  }
+
   .account-dialog {
     width: calc(100% - 1rem);
     max-height: calc(100vh - 1rem);
@@ -709,5 +718,16 @@
   .account-intro,
   .account-form > p {
     display: none;
+  }
+
+  .account-email-verification form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .account-email-verification label,
+  .account-email-verification input,
+  .account-email-verification button {
+    width: 100%;
   }
 }

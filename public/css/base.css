@@ -186,6 +186,19 @@ button:disabled {
   font-weight: 700;
 }
 
+.cart-feedback-link {
+  color: inherit;
+  font-weight: inherit;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 2px;
+}
+
+.cart-feedback-link:hover,
+.cart-feedback-link:focus-visible {
+  color: var(--ink);
+  text-decoration-color: var(--orange);
+}
+
 @keyframes progress-stripes {
   from { background-position: 1rem 0; }
   to { background-position: 0 0; }

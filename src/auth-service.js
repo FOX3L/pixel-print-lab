@@ -4,8 +4,9 @@ import { promisify } from "node:util";
 const scrypt = promisify(crypto.scrypt);
 const SESSION_COOKIE = "ppl_session";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 const SCRYPT_KEY_LENGTH = 64;
-const USERNAME_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{1,30}[a-z0-9])$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DUMMY_PASSWORD_HASH = "scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA$KeZz9UqPc9MxmhAJcEbr5s8vLnEhZQGY8nGwjvP2mV8oMsqSx9yknajYdTBCpT7tJYwo4M5GsqTzSZsXj8L98A";
 
 export class AuthError extends Error {
@@ -38,17 +39,6 @@ function normalizeUsername(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
-function validateUsername(value) {
-  const username = normalizeUsername(value);
-  if (!USERNAME_PATTERN.test(username)) {
-    throw new AuthError(
-      "INVALID_USERNAME",
-      "Il nome utente deve contenere da 3 a 32 caratteri: lettere, numeri, punto, trattino o underscore.",
-    );
-  }
-  return username;
-}
-
 function validateName(value, label) {
   const name = typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
   if (name.length < 1 || name.length > 60 || /[\u0000-\u001f\u007f]/.test(name)) {
@@ -62,6 +52,23 @@ function validatePassword(value) {
     throw new AuthError("INVALID_PASSWORD", "La password deve contenere da 10 a 128 caratteri.");
   }
   return value;
+}
+
+export function validateOptionalEmail(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string") {
+    throw new AuthError("INVALID_EMAIL", "L'indirizzo email non e valido.");
+  }
+  const email = value.trim();
+  if (!email) return null;
+  if (
+    email.length > 254 ||
+    /[\u0000-\u001f\u007f,;]/.test(email) ||
+    !EMAIL_PATTERN.test(email)
+  ) {
+    throw new AuthError("INVALID_EMAIL", "L'indirizzo email non e valido.");
+  }
+  return email;
 }
 
 async function hashPassword(password) {
@@ -103,13 +110,16 @@ function serializeAccount(account) {
     username: account.username,
     firstName: account.first_name,
     lastName: account.last_name,
+    email: account.email,
+    emailVerified: Boolean(account.email_verified_at),
+    emailNotificationsEnabled: Boolean(account.email_notifications_enabled),
     role: account.role,
   };
 }
 
-export function createAuthService({ database, adminUsername, adminPassword }) {
-  const configuredAdminUsername = normalizeUsername(adminUsername);
-  const adminConfigured = configuredAdminUsername.length > 0 && typeof adminPassword === "string" && adminPassword.length > 0;
+export function createAuthService({ database, adminEmail, adminPassword }) {
+  const configuredAdminEmail = validateOptionalEmail(adminEmail)?.toLowerCase() ?? "";
+  const adminConfigured = configuredAdminEmail.length > 0 && typeof adminPassword === "string" && adminPassword.length > 0;
   const findAccountByUsername = database.prepare("SELECT * FROM user_accounts WHERE username = ? COLLATE NOCASE");
   const findEnvironmentAccount = database.prepare(`
     SELECT * FROM user_accounts WHERE auth_source = 'environment' ORDER BY id LIMIT 1
@@ -121,22 +131,26 @@ export function createAuthService({ database, adminUsername, adminPassword }) {
     WHERE user_sessions.token_hash = ? AND user_sessions.expires_at > ?
   `);
   const insertLocalAccount = database.prepare(`
-    INSERT INTO user_accounts (username, password_hash, first_name, last_name)
-    VALUES (@username, @passwordHash, @firstName, @lastName)
+    INSERT INTO user_accounts (username, password_hash, first_name, last_name, email)
+    VALUES (@username, @passwordHash, @firstName, @lastName, @email)
   `);
   const insertEnvironmentAdmin = database.prepare(`
-    INSERT INTO user_accounts (username, password_hash, first_name, last_name, role, auth_source)
-    VALUES (@username, NULL, @firstName, @lastName, 'admin', 'environment')
+    INSERT INTO user_accounts (
+      username, password_hash, first_name, last_name, email, email_verified_at,
+      role, auth_source
+    )
+    VALUES (@email, NULL, @firstName, 'Admin', @email, CURRENT_TIMESTAMP, 'admin', 'environment')
   `);
   const reactivateEnvironmentAdmin = database.prepare(`
-    UPDATE user_accounts
-    SET username = @username, first_name = @firstName, last_name = @lastName,
-      role = 'admin', updated_at = CURRENT_TIMESTAMP
+    UPDATE user_accounts SET
+      username = @email, first_name = @firstName, last_name = 'Admin', email = @email,
+      email_verified_at = CURRENT_TIMESTAMP, role = 'admin', updated_at = CURRENT_TIMESTAMP
     WHERE id = @id AND auth_source = 'environment'
   `);
   const reactivateCurrentEnvironmentAdmin = database.prepare(`
     UPDATE user_accounts
-    SET role = 'admin', updated_at = CURRENT_TIMESTAMP
+    SET email = username, email_verified_at = CURRENT_TIMESTAMP,
+      role = 'admin', updated_at = CURRENT_TIMESTAMP
     WHERE id = ? AND auth_source = 'environment'
   `);
   const insertSession = database.prepare(`
@@ -145,6 +159,31 @@ export function createAuthService({ database, adminUsername, adminPassword }) {
   `);
   const deleteSession = database.prepare("DELETE FROM user_sessions WHERE token_hash = ?");
   const deleteExpiredSessions = database.prepare("DELETE FROM user_sessions WHERE expires_at <= ?");
+  const findAccountById = database.prepare("SELECT * FROM user_accounts WHERE id = ?");
+  const storeEmailVerification = database.prepare(`
+    INSERT INTO email_verification_tokens (user_account_id, token_hash, expires_at)
+    VALUES (@accountId, @tokenHash, @expiresAt)
+    ON CONFLICT(user_account_id) DO UPDATE SET
+      token_hash = excluded.token_hash,
+      expires_at = excluded.expires_at,
+      created_at = CURRENT_TIMESTAMP
+  `);
+  const findEmailVerification = database.prepare(`
+    SELECT * FROM email_verification_tokens WHERE user_account_id = ?
+  `);
+  const deleteEmailVerification = database.prepare(`
+    DELETE FROM email_verification_tokens WHERE user_account_id = ?
+  `);
+  const verifyAccountEmail = database.prepare(`
+    UPDATE user_accounts
+    SET email_verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND email IS NOT NULL
+  `);
+  const updateAccountEmailNotifications = database.prepare(`
+    UPDATE user_accounts
+    SET email_notifications_enabled = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND auth_source = 'local'
+  `);
   const getCredentialsOverride = database.prepare(`
     SELECT admin_username AS username, admin_password_hash AS passwordHash
     FROM app_settings WHERE id = 1
@@ -181,37 +220,35 @@ export function createAuthService({ database, adminUsername, adminPassword }) {
     return row?.username && row?.passwordHash ? row : null;
   }
 
-  function effectiveAdminUsername() {
-    return credentialsOverride()?.username ?? configuredAdminUsername;
+  function effectiveAdminEmail() {
+    return credentialsOverride()?.username ?? configuredAdminEmail;
   }
 
-  function environmentAdmin(adminUsername) {
-    const existing = findAccountByUsername.get(adminUsername);
+  function environmentAdmin(adminEmail) {
+    const existing = findAccountByUsername.get(adminEmail);
     if (existing && existing.auth_source !== "environment") {
       throw new AuthError(
         "ADMIN_ACCOUNT_CONFLICT",
-        "Il nome utente amministrativo coincide con un account cliente esistente. Configura un nome utente diverso.",
+        "L'email amministrativa coincide con un account cliente esistente. Configura un indirizzo diverso.",
         503,
       );
     }
     if (existing) {
       reactivateCurrentEnvironmentAdmin.run(existing.id);
-      return findAccountByUsername.get(adminUsername);
+      return findAccountByUsername.get(adminEmail);
     }
     const previousEnvironmentAccount = findEnvironmentAccount.get();
     if (previousEnvironmentAccount) {
       reactivateEnvironmentAdmin.run({
         id: previousEnvironmentAccount.id,
-        username: adminUsername,
-        firstName: adminUsername,
-        lastName: "Admin",
+        email: adminEmail,
+        firstName: adminEmail.split("@", 1)[0],
       });
-      return findAccountByUsername.get(adminUsername);
+      return findAccountByUsername.get(adminEmail);
     }
     const id = Number(insertEnvironmentAdmin.run({
-      username: adminUsername,
-      firstName: adminUsername,
-      lastName: "Admin",
+      email: adminEmail,
+      firstName: adminEmail.split("@", 1)[0],
     }).lastInsertRowid);
     return database.prepare("SELECT * FROM user_accounts WHERE id = ?").get(id);
   }
@@ -241,27 +278,85 @@ export function createAuthService({ database, adminUsername, adminPassword }) {
     return { account: account ?? null, token };
   }
 
-  async function register({ username: rawUsername, password: rawPassword, firstName, lastName }) {
-    const username = validateUsername(rawUsername);
-    if (username === effectiveAdminUsername()) {
-      throw new AuthError("USERNAME_UNAVAILABLE", "Il nome utente non e disponibile.", 409);
+  function createEmailVerification(accountId) {
+    const account = findAccountById.get(accountId);
+    if (!account?.email) {
+      throw new AuthError("EMAIL_NOT_AVAILABLE", "Questo account non ha un indirizzo email.", 409);
     }
-    if (findAccountByUsername.get(username)) {
-      throw new AuthError("USERNAME_UNAVAILABLE", "Il nome utente non e disponibile.", 409);
+    if (account.email_verified_at) {
+      throw new AuthError("EMAIL_ALREADY_VERIFIED", "L'indirizzo email e gia verificato.", 409);
+    }
+    const code = crypto.randomBytes(8).toString("hex").toUpperCase();
+    storeEmailVerification.run({
+      accountId,
+      tokenHash: tokenHash(code),
+      expiresAt: Date.now() + EMAIL_VERIFICATION_TTL_MS,
+    });
+    return { account, code };
+  }
+
+  const applyEmailVerification = database.transaction((accountId) => {
+    verifyAccountEmail.run(accountId);
+    deleteEmailVerification.run(accountId);
+    return findAccountById.get(accountId);
+  });
+
+  function confirmEmail(accountId, value) {
+    const account = findAccountById.get(accountId);
+    if (account?.email_verified_at) {
+      throw new AuthError("EMAIL_ALREADY_VERIFIED", "L'indirizzo email e gia verificato.", 409);
+    }
+    const code = typeof value === "string" ? value.trim().toUpperCase() : "";
+    if (!/^[A-F0-9]{16}$/.test(code)) {
+      throw new AuthError("INVALID_EMAIL_CODE", "Il codice di verifica non e valido.");
+    }
+    const verification = findEmailVerification.get(accountId);
+    if (!verification || verification.expires_at <= Date.now()) {
+      if (verification) deleteEmailVerification.run(accountId);
+      throw new AuthError("EMAIL_CODE_EXPIRED", "Il codice e scaduto. Richiedine uno nuovo.", 410);
+    }
+    const expected = Buffer.from(verification.token_hash, "hex");
+    const actual = Buffer.from(tokenHash(code), "hex");
+    if (!crypto.timingSafeEqual(expected, actual)) {
+      throw new AuthError("INVALID_EMAIL_CODE", "Il codice di verifica non e valido.");
+    }
+    return applyEmailVerification(accountId);
+  }
+
+  function setEmailNotifications(accountId, enabled) {
+    if (typeof enabled !== "boolean") {
+      throw new AuthError("INVALID_EMAIL_PREFERENCE", "La preferenza delle notifiche non e valida.");
+    }
+    const result = updateAccountEmailNotifications.run(enabled ? 1 : 0, accountId);
+    if (!result.changes) {
+      throw new AuthError("ACCOUNT_NOT_AVAILABLE", "Account non disponibile.", 404);
+    }
+    return findAccountById.get(accountId);
+  }
+
+  async function register({ password: rawPassword, firstName, lastName, email: rawEmail }) {
+    const email = validateOptionalEmail(rawEmail)?.toLowerCase();
+    if (!email) throw new AuthError("INVALID_EMAIL", "L'indirizzo email e obbligatorio.");
+    if (email === effectiveAdminEmail()) {
+      throw new AuthError("EMAIL_UNAVAILABLE", "Esiste gia un account con questo indirizzo email.", 409);
+    }
+    if (findAccountByUsername.get(email)) {
+      throw new AuthError("EMAIL_UNAVAILABLE", "Esiste gia un account con questo indirizzo email.", 409);
     }
     const password = validatePassword(rawPassword);
     const values = {
-      username,
+      username: email,
       passwordHash: await hashPassword(password),
       firstName: validateName(firstName, "Il nome"),
       lastName: validateName(lastName, "Il cognome"),
+      email,
     };
     try {
       const id = Number(insertLocalAccount.run(values).lastInsertRowid);
       return database.prepare("SELECT * FROM user_accounts WHERE id = ?").get(id);
     } catch (error) {
       if (error?.code?.startsWith("SQLITE_CONSTRAINT")) {
-        throw new AuthError("USERNAME_UNAVAILABLE", "Il nome utente non e disponibile.", 409);
+        throw new AuthError("EMAIL_UNAVAILABLE", "Esiste gia un account con questo indirizzo email.", 409);
       }
       throw error;
     }
@@ -276,21 +371,21 @@ export function createAuthService({ database, adminUsername, adminPassword }) {
         return environmentAdmin(override.username);
       }
     } else if (
-      adminConfigured && username === configuredAdminUsername &&
+      adminConfigured && username === configuredAdminEmail &&
       credentialMatches(password, adminPassword)
     ) {
-      return environmentAdmin(configuredAdminUsername);
+      return environmentAdmin(configuredAdminEmail);
     }
 
     if (adminOnly) {
-      throw new AuthError("INVALID_CREDENTIALS", "Nome utente o password non corretti.", 401);
+      throw new AuthError("INVALID_CREDENTIALS", "Credenziali non corrette.", 401);
     }
     const account = findAccountByUsername.get(username);
     const valid = account?.auth_source === "local"
       ? await verifyPassword(password, account.password_hash)
       : await verifyPassword(password);
     if (!valid) {
-      throw new AuthError("INVALID_CREDENTIALS", "Nome utente o password non corretti.", 401);
+      throw new AuthError("INVALID_CREDENTIALS", "Email o password non corrette.", 401);
     }
     return account;
   }
@@ -345,12 +440,12 @@ export function createAuthService({ database, adminUsername, adminPassword }) {
     deleteEnvironmentSessions.run();
   });
 
-  async function changeAdminCredentials({ currentPassword, username: rawUsername, password: rawPassword }) {
+  async function changeAdminCredentials({ currentPassword, email: rawEmail, password: rawPassword }) {
     const override = credentialsOverride();
     if (!override && !adminConfigured) {
       throw new AuthError(
         "ADMIN_NOT_CONFIGURED",
-        "Imposta ADMIN_USERNAME e ADMIN_PASSWORD prima di usare il pannello amministrativo.",
+        "Imposta ADMIN_EMAIL e ADMIN_PASSWORD prima di usare il pannello amministrativo.",
         503,
       );
     }
@@ -361,15 +456,17 @@ export function createAuthService({ database, adminUsername, adminPassword }) {
     if (!currentPasswordValid) {
       throw new AuthError("INVALID_CREDENTIALS", "La password attuale non e corretta.", 401);
     }
-    const hasUsername = typeof rawUsername === "string" && rawUsername.trim().length > 0;
+    const hasEmail = typeof rawEmail === "string" && rawEmail.trim().length > 0;
     const hasPassword = typeof rawPassword === "string" && rawPassword.length > 0;
-    if (!hasUsername && !hasPassword) {
-      throw new AuthError("INVALID_CREDENTIALS_UPDATE", "Indica un nuovo nome utente o una nuova password.");
+    if (!hasEmail && !hasPassword) {
+      throw new AuthError("INVALID_CREDENTIALS_UPDATE", "Indica una nuova email o una nuova password.");
     }
-    const username = hasUsername ? validateUsername(rawUsername) : override?.username ?? configuredAdminUsername;
-    const conflictingAccount = findAccountByUsername.get(username);
+    const email = hasEmail
+      ? validateOptionalEmail(rawEmail)?.toLowerCase()
+      : override?.username ?? configuredAdminEmail;
+    const conflictingAccount = findAccountByUsername.get(email);
     if (conflictingAccount && conflictingAccount.auth_source !== "environment") {
-      throw new AuthError("USERNAME_UNAVAILABLE", "Il nome utente non e disponibile.", 409);
+      throw new AuthError("EMAIL_UNAVAILABLE", "Esiste gia un account con questo indirizzo email.", 409);
     }
     let passwordHash;
     if (hasPassword) {
@@ -379,8 +476,8 @@ export function createAuthService({ database, adminUsername, adminPassword }) {
     } else {
       passwordHash = await hashPassword(candidate);
     }
-    applyCredentialsOverride({ username, passwordHash });
-    return { username };
+    applyCredentialsOverride({ username: email, passwordHash });
+    return { email };
   }
 
   function resetAdminCredentials() {
@@ -396,7 +493,7 @@ export function createAuthService({ database, adminUsername, adminPassword }) {
     },
     adminAccess: () => {
       const override = credentialsOverride();
-      return { username: override?.username ?? configuredAdminUsername, customized: Boolean(override) };
+      return { email: override?.username ?? configuredAdminEmail, customized: Boolean(override) };
     },
     changeAdminCredentials,
     createSession,
@@ -408,9 +505,12 @@ export function createAuthService({ database, adminUsername, adminPassword }) {
     requireAdmin,
     resetAdminCredentials,
     serializeAccount,
-    isAdminUsername: (username) => {
-      const adminName = effectiveAdminUsername();
-      return adminName.length > 0 && normalizeUsername(username) === adminName;
+    createEmailVerification,
+    confirmEmail,
+    setEmailNotifications,
+    isAdminEmail: (username) => {
+      const adminEmail = effectiveAdminEmail();
+      return adminEmail.length > 0 && normalizeUsername(username) === adminEmail;
     },
   };
 }

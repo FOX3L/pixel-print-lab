@@ -21,7 +21,7 @@ export function createApp({
   uploadDirectory,
   orderFileDirectory,
   catalogDirectory,
-  adminUsername,
+  adminEmail,
   adminPassword,
   trustProxy = false,
   emailService,
@@ -34,7 +34,7 @@ export function createApp({
   }
 
   const app = express();
-  const auth = createAuthService({ database, adminUsername, adminPassword });
+  const auth = createAuthService({ database, adminEmail, adminPassword });
 
   app.disable("x-powered-by");
   app.use((request, response, next) => {
@@ -63,7 +63,13 @@ export function createApp({
   });
 
   registerCatalogRoutes(app, database, catalogDirectory);
-  registerAccountRoutes(app, { database, auth, orderFileDirectory, disableRateLimits: disableAuthRateLimits });
+  registerAccountRoutes(app, {
+    database,
+    auth,
+    orderFileDirectory,
+    emailService,
+    disableRateLimits: disableAuthRateLimits,
+  });
   registerOrderRoutes(app, {
     database,
     uploadDirectory,

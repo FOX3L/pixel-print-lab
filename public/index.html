@@ -6,11 +6,11 @@
     <meta name="description" content="Scegli un modello o proponi il tuo file 3MF per una stampa 3D.">
     <title>Pixel Print Lab | PIX3LLAB</title>
     <link rel="icon" href="/brand/PIX3LLAB-favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="/css/base.css?v=1.3.1">
+    <link rel="stylesheet" href="/css/base.css?v=1.3.3">
     <link rel="stylesheet" href="/css/layout.css?v=1.3.1">
     <link rel="stylesheet" href="/css/catalog.css?v=1.2.9">
     <link rel="stylesheet" href="/css/custom-model.css?v=1.2.9">
-    <link rel="stylesheet" href="/css/dialogs.css?v=1.2.9">
+    <link rel="stylesheet" href="/css/dialogs.css?v=1.3.2">
     <link rel="stylesheet" href="/css/responsive.css?v=1.3.1">
     <script type="importmap">
       {
@@ -258,7 +258,7 @@
               <span>Link al modello</span>
               <input id="custom-link" name="url" type="url" inputmode="url" placeholder="https://makerworld.com/en/models/...">
             </label>
-            <p class="field-hint">Sono accettati solo link da MakerWorld. Il link si aprira in una nuova pagina.</p>
+            <p class="field-hint">Sono accettati solo link da <a href="https://makerworld.com/" target="_blank" rel="noopener noreferrer">MakerWorld</a>. Il link si aprira in una nuova pagina.</p>
           </div>
 
           <fieldset class="custom-colors">
@@ -390,6 +390,10 @@
               <span>Cognome</span>
               <input id="last-name" name="lastName" type="text" maxlength="60" autocomplete="family-name" required>
             </label>
+            <label class="checkout-form__comment" for="order-comment">
+              <span>Commento <small>(facoltativo)</small></span>
+              <textarea id="order-comment" name="comment" rows="4" maxlength="500" placeholder="Indicazioni, stampa multicolore o richieste particolari"></textarea>
+            </label>
             <p id="checkout-customer-note">Puoi inviare la richiesta come ospite. Accordi e consegna avverranno privatamente.</p>
             <p class="checkout-feedback" id="checkout-feedback" role="status"></p>
             <button class="checkout-submit" id="checkout-submit" type="submit">Conferma e invia</button>
@@ -405,6 +409,25 @@
           <form method="dialog">
             <button class="pixel-button" type="submit">Chiudi</button>
           </form>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="guest-order-dialog" id="guest-order-dialog" aria-labelledby="guest-order-title">
+      <div class="guest-order-dialog__content">
+        <p class="section-number">Prima di inviare</p>
+        <h2 id="guest-order-title">Con un account tieni tutto a portata di mano.</h2>
+        <p>Puoi comunque ordinare come ospite. Registrandoti, invece, ritrovi nello storico il codice, lo stato e i dettagli delle tue richieste.</p>
+        <ul>
+          <li>Storico personale degli ordini</li>
+          <li>Nome e cognome gia compilati nei prossimi ordini</li>
+          <li>Stato e preventivi sempre consultabili</li>
+          <li>Avviso email quando l'ordine entra in lavorazione</li>
+          <li>Gestione delle tue richieste da un unico spazio</li>
+        </ul>
+        <div class="guest-order-dialog__actions">
+          <button id="guest-order-continue" type="button">Continua come ospite</button>
+          <button id="guest-order-account" type="button">Accedi o registrati</button>
         </div>
       </div>
     </dialog>
@@ -427,7 +450,7 @@
           <div class="account-access-grid">
             <form class="account-form" id="account-login-form">
               <h3>Accedi</h3>
-              <label for="login-username"><span>Nome utente</span><input id="login-username" name="username" type="text" autocomplete="username" required></label>
+              <label for="login-email"><span>Email</span><input id="login-email" name="email" type="email" maxlength="254" autocomplete="email" required></label>
               <label for="login-password"><span>Password</span><input id="login-password" name="password" type="password" autocomplete="current-password" required></label>
               <button type="submit">Entra</button>
             </form>
@@ -438,9 +461,10 @@
                 <label for="register-first-name"><span>Nome</span><input id="register-first-name" name="firstName" type="text" maxlength="60" autocomplete="given-name" required></label>
                 <label for="register-last-name"><span>Cognome</span><input id="register-last-name" name="lastName" type="text" maxlength="60" autocomplete="family-name" required></label>
               </div>
-              <label for="register-username"><span>Nome utente</span><input id="register-username" name="username" type="text" minlength="3" maxlength="32" pattern="[A-Za-z0-9][A-Za-z0-9._-]{1,30}[A-Za-z0-9]" autocomplete="username" required></label>
+              <label for="register-email"><span>Email</span><input id="register-email" name="email" type="email" maxlength="254" autocomplete="email" aria-describedby="register-email-hint" required></label>
+              <p id="register-email-hint">Sara il tuo identificativo di accesso. Ti invieremo un codice di verifica per attivare gli avvisi sugli ordini.</p>
               <label for="register-password"><span>Password</span><input id="register-password" name="password" type="password" minlength="10" maxlength="128" autocomplete="new-password" required></label>
-              <p>Almeno 10 caratteri. Il nome utente non potra essere modificato.</p>
+              <p>La password deve avere almeno 10 caratteri.</p>
               <button type="submit">Registrati</button>
             </form>
           </div>
@@ -453,12 +477,28 @@
               <p class="section-number">Sessione attiva</p>
               <h3 id="account-display-name" tabindex="-1"></h3>
               <p id="account-username"></p>
+              <p id="account-email" hidden></p>
+              <label class="account-notification-toggle" id="account-notification-toggle" hidden>
+                <input id="account-email-notifications" type="checkbox">
+                <span>Ricevi notifiche email sugli ordini</span>
+              </label>
+              <p class="account-feedback" id="account-preferences-feedback" role="status"></p>
             </div>
             <div class="account-profile__actions">
               <a class="account-admin-link" id="account-admin-link" href="/admin.html" hidden>Control Room</a>
               <button id="account-logout" type="button">Esci</button>
             </div>
           </div>
+          <section class="account-email-verification" id="account-email-verification" aria-labelledby="account-email-verification-title" hidden>
+            <h3 id="account-email-verification-title">Verifica la tua email</h3>
+            <p>Inserisci il codice di 16 caratteri ricevuto via email. Scade dopo 24 ore.</p>
+            <form id="account-email-verification-form">
+              <label for="account-email-code"><span>Codice di verifica</span><input id="account-email-code" name="code" type="text" minlength="16" maxlength="16" pattern="[A-Fa-f0-9]{16}" autocomplete="one-time-code" required></label>
+              <button type="submit">Verifica email</button>
+              <button id="account-email-resend" type="button">Invia nuovo codice</button>
+            </form>
+            <p class="account-feedback" id="account-email-feedback" role="status"></p>
+          </section>
           <section class="account-orders" aria-labelledby="account-orders-title">
             <div class="account-orders__heading">
               <h3 id="account-orders-title">I tuoi ordini</h3>
@@ -480,11 +520,12 @@
             <button class="account-order-delete" data-field="account-order-delete" type="button" aria-label="Elimina ordine">Elimina</button>
           </div>
         </header>
+        <p class="account-order__comment" data-field="account-order-comment" hidden></p>
         <ul data-field="account-order-items"></ul>
         <p class="account-order__total"><span data-field="account-order-total-label">Totale</span><strong data-field="account-order-total"></strong></p>
       </article>
     </template>
 
-    <script type="module" src="/app.js?v=1.2.9"></script>
+    <script type="module" src="/app.js?v=1.3.3"></script>
   </body>
 </html>

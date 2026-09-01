@@ -35,7 +35,7 @@ export function initAuth({ api, onAuthenticated }) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          username: formData.get("username"),
+          email: formData.get("email"),
           password: formData.get("password"),
         }),
       });

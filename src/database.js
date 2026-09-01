@@ -381,6 +381,61 @@ const migrations = [
       CREATE INDEX products_visible_sort_idx ON products (visible, id);
     `,
   },
+  {
+    version: 17,
+    name: "add_order_comment",
+    sql: `
+      ALTER TABLE orders
+      ADD COLUMN comment TEXT;
+    `,
+  },
+  {
+    version: 18,
+    name: "add_account_email",
+    sql: `
+      ALTER TABLE user_accounts
+      ADD COLUMN email TEXT;
+    `,
+  },
+  {
+    version: 19,
+    name: "add_email_verification",
+    sql: `
+      ALTER TABLE user_accounts
+      ADD COLUMN email_verified_at TEXT;
+
+      CREATE TABLE email_verification_tokens (
+        user_account_id INTEGER PRIMARY KEY,
+        token_hash TEXT NOT NULL UNIQUE,
+        expires_at INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_account_id) REFERENCES user_accounts(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX email_verification_expiry_idx
+        ON email_verification_tokens (expires_at);
+    `,
+  },
+  {
+    version: 20,
+    name: "use_email_for_customer_accounts",
+    sql: `
+      DELETE FROM user_accounts WHERE auth_source = 'local';
+
+      CREATE UNIQUE INDEX user_accounts_email_idx
+        ON user_accounts (email COLLATE NOCASE)
+      WHERE email IS NOT NULL;
+    `,
+  },
+  {
+    version: 21,
+    name: "add_account_email_notification_preference",
+    sql: `
+      ALTER TABLE user_accounts
+      ADD COLUMN email_notifications_enabled INTEGER NOT NULL DEFAULT 1
+        CHECK (email_notifications_enabled IN (0, 1));
+    `,
+  },
 ];
 
 const products = [

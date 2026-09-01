@@ -10,7 +10,7 @@ services:
     env_file:
       - .env
     environment:
-      ADMIN_USERNAME: "${ADMIN_USERNAME:?Set ADMIN_USERNAME in the .env file}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:?Set ADMIN_EMAIL in the .env file}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in the .env file}"
       TRUST_PROXY: "true"
 

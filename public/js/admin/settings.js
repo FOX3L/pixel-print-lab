@@ -23,7 +23,7 @@ export function initSettings({ api, onCredentialsSaved }) {
     minQuoteCents: document.querySelector("#pricing-min-quote"),
   };
   const credentialsForm = document.querySelector("#credentials-form");
-  const credentialsUsername = document.querySelector("#credentials-username");
+  const credentialsEmail = document.querySelector("#credentials-email");
   const credentialsCurrentPassword = document.querySelector("#credentials-current-password");
   const credentialsNewPassword = document.querySelector("#credentials-new-password");
   const credentialsFeedback = document.querySelector("#credentials-feedback");
@@ -43,7 +43,7 @@ export function initSettings({ api, onCredentialsSaved }) {
       input.value = pricingCentsFields.has(field) ? (value / 100).toFixed(2) : value;
     }
     credentialsForm.reset();
-    credentialsUsername.value = settings.adminUsername;
+    credentialsEmail.value = settings.adminEmail;
     credentialsFeedback.textContent = "";
     credentialsFeedback.classList.remove("admin-feedback--error");
   }
@@ -113,7 +113,7 @@ export function initSettings({ api, onCredentialsSaved }) {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          username: credentialsUsername.value,
+          email: credentialsEmail.value,
           currentPassword: credentialsCurrentPassword.value,
           password: credentialsNewPassword.value || undefined,
         }),

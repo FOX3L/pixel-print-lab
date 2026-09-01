@@ -3,6 +3,7 @@ import { state, setCart, notifyCatalogLoaded } from "./state.js";
 import { euroFormatter } from "./format.js";
 import { createColorOption } from "./colors.js";
 import { getViewerModule } from "./viewer-loader.js";
+import { setCartFeedback } from "./cart-ui.js";
 
 const MAX_DESCRIPTION_LENGTH = 120;
 
@@ -100,9 +101,10 @@ export function initCatalog() {
       );
 
       setCart(addCartItem(state.cart, { productId: product.id, colorId, quantity }));
-      feedback.textContent = existingItem
-        ? "Quantita aggiornata nel carrello."
-        : "Aggiunto al carrello."
+      setCartFeedback(
+        feedback,
+        existingItem ? "Quantita aggiornata nel " : "Aggiunto al ",
+      );
     });
 
     const detailsToggle = card.querySelector('[data-field="details-toggle"]');

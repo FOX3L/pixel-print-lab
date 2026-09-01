@@ -7,6 +7,10 @@ const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 5;
 const REGISTRATION_WINDOW_MS = 60 * 60 * 1000;
 const MAX_REGISTRATIONS = 5;
+const EMAIL_VERIFICATION_WINDOW_MS = 15 * 60 * 1000;
+const MAX_EMAIL_VERIFICATION_ATTEMPTS = 10;
+const EMAIL_RESEND_WINDOW_MS = 60 * 60 * 1000;
+const MAX_EMAIL_RESENDS = 5;
 
 function sendAuthError(response, error) {
   if (error instanceof AuthError) {
@@ -69,6 +73,7 @@ function serializeOrder(order, items) {
     code: order.code,
     firstName: order.first_name,
     lastName: order.last_name,
+    comment: order.comment,
     catalogTotalCents: order.catalog_total_cents,
     totalPriceCents,
     priceStatus,
@@ -80,11 +85,13 @@ function serializeOrder(order, items) {
 
 export function registerAccountRoutes(
   app,
-  { database, auth, orderFileDirectory = defaultOrderFileDirectory, disableRateLimits = false },
+  { database, auth, orderFileDirectory = defaultOrderFileDirectory, emailService, disableRateLimits = false },
 ) {
   const accountLoginAttempts = new Map();
   const adminLoginAttempts = new Map();
   const registrationAttempts = new Map();
+  const emailVerificationAttempts = new Map();
+  const emailResendAttempts = new Map();
   const listOrders = database.prepare(`
     SELECT * FROM orders
     WHERE user_account_id = ?
@@ -121,6 +128,24 @@ export function registerAccountRoutes(
     attempts.set(key, { ...current, count: current.count + 1 });
   }
 
+  async function sendEmailVerification(accountId) {
+    if (!emailService?.configured) {
+      throw new AuthError("EMAIL_UNAVAILABLE", "Invio email temporaneamente non disponibile.", 503);
+    }
+    const { account, code } = auth.createEmailVerification(accountId);
+    await emailService.sendOrderEmail({
+      to: account.email,
+      subject: "Verifica il tuo indirizzo email PIX3LLAB",
+      text: [
+        `Il tuo codice di verifica e: ${code}`,
+        "",
+        "Inseriscilo nella tua area account entro 24 ore.",
+        "Se non hai richiesto tu questa verifica, puoi ignorare il messaggio.",
+        "",
+      ].join("\n"),
+    });
+  }
+
   async function handleLogin(request, response, adminOnly = false) {
     let rateLimit;
     let attempts;
@@ -128,13 +153,14 @@ export function registerAccountRoutes(
       if (adminOnly && !auth.adminConfigured) {
         throw new AuthError(
           "ADMIN_NOT_CONFIGURED",
-          "Imposta ADMIN_USERNAME e ADMIN_PASSWORD prima di usare il pannello amministrativo.",
+          "Imposta ADMIN_EMAIL e ADMIN_PASSWORD prima di usare il pannello amministrativo.",
           503,
         );
       }
-      const username = typeof request.body?.username === "string" ? request.body.username.trim().toLowerCase() : "";
+      const credential = request.body?.email;
+      const username = typeof credential === "string" ? credential.trim().toLowerCase() : "";
       if (!disableRateLimits) {
-        attempts = adminOnly || auth.isAdminUsername(username) ? adminLoginAttempts : accountLoginAttempts;
+        attempts = adminOnly || auth.isAdminEmail(username) ? adminLoginAttempts : accountLoginAttempts;
         rateLimit = checkRateLimit(
           attempts,
           `${request.ip}:${username}`,
@@ -143,7 +169,7 @@ export function registerAccountRoutes(
         );
         recordAttempt(attempts, rateLimit, LOGIN_WINDOW_MS);
       }
-      const account = await auth.login(request.body?.username, request.body?.password, { adminOnly });
+      const account = await auth.login(credential, request.body?.password, { adminOnly });
       if (!disableRateLimits && attempts && rateLimit) attempts.delete(rateLimit.key);
       return response.status(201).json({ data: auth.createSession(request, response, account) });
     } catch (error) {
@@ -166,6 +192,13 @@ export function registerAccountRoutes(
         recordAttempt(registrationAttempts, rateLimit, REGISTRATION_WINDOW_MS);
       }
       const account = await auth.register(request.body ?? {});
+      if (account.email && emailService?.configured) {
+        try {
+          await sendEmailVerification(account.id);
+        } catch (error) {
+          console.error(`Email di verifica non inviata per @${account.username}.`, error);
+        }
+      }
       return response.status(201).json({ data: auth.createSession(request, response, account) });
     } catch (error) {
       return sendAuthError(response, error);
@@ -181,6 +214,56 @@ export function registerAccountRoutes(
 
   app.get("/api/account/session", auth.requireAccount, (request, response) => {
     response.json({ data: auth.serializeAccount(request.userAccount) });
+  });
+
+  app.post("/api/account/email/verify", auth.requireAccount, (request, response) => {
+    try {
+      let rateLimit;
+      if (!disableRateLimits) {
+        rateLimit = checkRateLimit(
+          emailVerificationAttempts,
+          `${request.ip}:${request.userAccount.id}`,
+          MAX_EMAIL_VERIFICATION_ATTEMPTS,
+          "Troppi tentativi di verifica. Riprova piu tardi.",
+        );
+        recordAttempt(emailVerificationAttempts, rateLimit, EMAIL_VERIFICATION_WINDOW_MS);
+      }
+      const account = auth.confirmEmail(request.userAccount.id, request.body?.code);
+      if (!disableRateLimits && rateLimit) emailVerificationAttempts.delete(rateLimit.key);
+      return response.json({ data: auth.serializeAccount(account) });
+    } catch (error) {
+      return sendAuthError(response, error);
+    }
+  });
+
+  app.post("/api/account/email/resend", auth.requireAccount, async (request, response) => {
+    try {
+      if (!disableRateLimits) {
+        const rateLimit = checkRateLimit(
+          emailResendAttempts,
+          `${request.ip}:${request.userAccount.id}`,
+          MAX_EMAIL_RESENDS,
+          "Hai richiesto troppi codici. Riprova piu tardi.",
+        );
+        recordAttempt(emailResendAttempts, rateLimit, EMAIL_RESEND_WINDOW_MS);
+      }
+      await sendEmailVerification(request.userAccount.id);
+      return response.status(204).end();
+    } catch (error) {
+      return sendAuthError(response, error);
+    }
+  });
+
+  app.patch("/api/account/preferences", auth.requireAccount, (request, response) => {
+    try {
+      const account = auth.setEmailNotifications(
+        request.userAccount.id,
+        request.body?.emailNotificationsEnabled,
+      );
+      return response.json({ data: auth.serializeAccount(account) });
+    } catch (error) {
+      return sendAuthError(response, error);
+    }
   });
 
   app.get("/api/account/orders", auth.requireAccount, (request, response) => {

@@ -15,6 +15,8 @@ export function initOrders({ api }) {
   const saveOrderStatusButton = document.querySelector("#save-order-status");
   const firstNameValue = document.querySelector("#order-first-name");
   const lastNameValue = document.querySelector("#order-last-name");
+  const orderCommentPanel = document.querySelector("#order-comment-panel");
+  const orderComment = document.querySelector("#order-comment");
   const adminItems = document.querySelector("#admin-items");
   const adminItemTemplate = document.querySelector("#admin-item-template");
   const orderFeedback = document.querySelector("#order-feedback");
@@ -214,6 +216,8 @@ export function initOrders({ api }) {
     orderStatusSelect.value = state.currentOrder.status;
     firstNameValue.textContent = state.currentOrder.firstName;
     lastNameValue.textContent = state.currentOrder.lastName;
+    orderCommentPanel.hidden = !state.currentOrder.comment;
+    orderComment.textContent = state.currentOrder.comment ?? "";
     adminItems.replaceChildren(...state.currentOrder.items.map(createItemEditor));
     orderFeedback.textContent = "";
     if (state.currentSection === "archive") renderArchiveList();

@@ -6,11 +6,11 @@ const database = openDatabase();
 try {
   const auth = createAuthService({
     database,
-    adminUsername: process.env.ADMIN_USERNAME,
+    adminEmail: process.env.ADMIN_EMAIL,
     adminPassword: process.env.ADMIN_PASSWORD,
   });
   auth.resetAdminCredentials();
-  console.log("Credenziali personalizzate rimosse: valgono di nuovo ADMIN_USERNAME e ADMIN_PASSWORD.");
+  console.log("Credenziali personalizzate rimosse: valgono di nuovo ADMIN_EMAIL e ADMIN_PASSWORD.");
 } finally {
   database.close();
 }
