@@ -208,6 +208,9 @@ export function createAuthService({ database, adminEmail, adminPassword }) {
   const deleteAccountSessions = database.prepare(`
     DELETE FROM user_sessions WHERE user_account_id = ?
   `);
+  const deleteLocalAccount = database.prepare(`
+    DELETE FROM user_accounts WHERE id = ? AND auth_source = 'local'
+  `);
   const getCredentialsOverride = database.prepare(`
     SELECT admin_username AS username, admin_password_hash AS passwordHash
     FROM app_settings WHERE id = 1
@@ -403,6 +406,22 @@ export function createAuthService({ database, adminEmail, adminPassword }) {
     applyPasswordReset(account.id, await hashPassword(password));
   }
 
+  async function deleteAccount(accountId, passwordValue) {
+    const account = findAccountById.get(accountId);
+    if (!account || account.auth_source !== "local" || account.role !== "customer") {
+      throw new AuthError(
+        "ACCOUNT_DELETE_FORBIDDEN",
+        "Questo account non puo essere eliminato dal profilo.",
+        403,
+      );
+    }
+    const password = typeof passwordValue === "string" ? passwordValue : "";
+    if (!await verifyPassword(password, account.password_hash)) {
+      throw new AuthError("INVALID_PASSWORD", "La password non e corretta.", 401);
+    }
+    deleteLocalAccount.run(account.id);
+  }
+
   async function register({ password: rawPassword, firstName, lastName, email: rawEmail }) {
     const email = validateOptionalEmail(rawEmail)?.toLowerCase();
     if (!email) throw new AuthError("INVALID_EMAIL", "L'indirizzo email e obbligatorio.");
@@ -579,6 +598,7 @@ export function createAuthService({ database, adminEmail, adminPassword }) {
     setEmailNotifications,
     createPasswordReset,
     resetPassword,
+    deleteAccount,
     isAdminEmail: (username) => {
       const adminEmail = effectiveAdminEmail();
       return adminEmail.length > 0 && normalizeUsername(username) === adminEmail;

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title description" shape-rendering="crispEdges">
+  <title id="title">Pix</title>
+  <desc id="description">Icona pixel art della moneta Pix arancione e blu con una P perfettamente centrata</desc>
+
+  <!-- Dark outline -->
+  <path fill="#17201a" d="M40 8h48v8h16v16h8v16h8v32h-8v16h-8v16H88v8H40v-8H24V96h-8V80H8V48h8V32h8V16h16z"/>
+
+  <!-- Orange body -->
+  <path fill="#ff6534" d="M40 16h48v8h16v16h8v48h-8v16H88v8H40v-8H24V88h-8V40h8V24h16z"/>
+
+  <!-- Blue edge -->
+  <path fill="#4277ff" d="M40 16h48v8H32v16h-8v48h-8V40h8V24h16z"/>
+
+  <!-- Light inner face -->
+  <path fill="#f3f0e6" d="M32 32h64v64H32z"/>
+
+  <!-- Centered P, x=48..80 and y=44..92 -->
+  <path fill="#17201a" d="M48 44h24v8h8v20h-8v8H56v12H48zm16 8v12h8V52z"/>
+
+  <!-- Orange pixel detail -->
+  <path fill="#ff6534" d="M96 48h8v16h-8z"/>
+</svg>

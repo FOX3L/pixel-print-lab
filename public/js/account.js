@@ -34,6 +34,11 @@ export function initAccount() {
   const accountEmailResend = document.querySelector("#account-email-resend");
   const accountEmailFeedback = document.querySelector("#account-email-feedback");
   const accountAdminLink = document.querySelector("#account-admin-link");
+  const accountDeleteOpen = document.querySelector("#account-delete-open");
+  const accountDeleteSection = document.querySelector("#account-delete");
+  const accountDeleteForm = document.querySelector("#account-delete-form");
+  const accountDeleteCancel = document.querySelector("#account-delete-cancel");
+  const accountDeleteFeedback = document.querySelector("#account-delete-feedback");
   const accountLogoutButton = document.querySelector("#account-logout");
   const accountOrdersRefresh = document.querySelector("#account-orders-refresh");
   const accountOrdersStatus = document.querySelector("#account-orders-status");
@@ -71,6 +76,7 @@ export function initAccount() {
     accountEmailNotifications.checked = state.currentAccount.emailNotificationsEnabled;
     accountEmailVerification.hidden = !state.currentAccount.email || state.currentAccount.emailVerified;
     accountAdminLink.hidden = state.currentAccount.role !== "admin";
+    accountDeleteOpen.hidden = state.currentAccount.role === "admin";
   }
 
   function renderAccountOrders(orders) {
@@ -337,6 +343,45 @@ export function initAccount() {
       accountPreferencesFeedback.classList.add("account-feedback--error");
     } finally {
       accountEmailNotifications.disabled = false;
+    }
+  });
+  accountDeleteOpen.addEventListener("click", () => {
+    accountDeleteForm.reset();
+    accountDeleteFeedback.textContent = "";
+    accountDeleteSection.hidden = false;
+    document.querySelector("#account-delete-password").focus();
+  });
+  accountDeleteCancel.addEventListener("click", () => {
+    accountDeleteForm.reset();
+    accountDeleteFeedback.textContent = "";
+    accountDeleteSection.hidden = true;
+  });
+  accountDeleteForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!confirm("Eliminare definitivamente il profilo? L'operazione non puo essere annullata.")) return;
+    const submitButton = accountDeleteForm.querySelector('[type="submit"]');
+    submitButton.disabled = true;
+    accountDeleteFeedback.textContent = "Eliminazione in corso...";
+    accountDeleteFeedback.classList.remove("account-feedback--error");
+    try {
+      await api("/api/account", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(new FormData(accountDeleteForm))),
+      });
+      state.currentAccount = undefined;
+      accountStateVersion += 1;
+      accountDeleteForm.reset();
+      accountDeleteSection.hidden = true;
+      renderAccount();
+      accountGuestFeedback.textContent = "Profilo eliminato. Gli ordini precedenti restano conservati come ordini ospite.";
+      accountGuestFeedback.classList.remove("account-feedback--error");
+      document.querySelector("#login-email").focus();
+    } catch (error) {
+      accountDeleteFeedback.textContent = error.message;
+      accountDeleteFeedback.classList.add("account-feedback--error");
+    } finally {
+      submitButton.disabled = false;
     }
   });
   accountLogoutButton.addEventListener("click", async () => {

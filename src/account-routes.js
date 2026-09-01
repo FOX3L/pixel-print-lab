@@ -1,6 +1,7 @@
 import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { AuthError } from "./auth-service.js";
+import { EmailDailyLimitError } from "./email-service.js";
 import { defaultOrderFileDirectory } from "./order-routes.js";
 
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -139,17 +140,28 @@ export function registerAccountRoutes(
       throw new AuthError("EMAIL_UNAVAILABLE", "Invio email temporaneamente non disponibile.", 503);
     }
     const { account, code } = auth.createEmailVerification(accountId);
-    await emailService.sendOrderEmail({
-      to: account.email,
-      subject: "Verifica il tuo indirizzo email PIX3LLAB",
-      text: [
-        `Il tuo codice di verifica e: ${code}`,
-        "",
-        "Inseriscilo nella tua area account entro 24 ore.",
-        "Se non hai richiesto tu questa verifica, puoi ignorare il messaggio.",
-        "",
-      ].join("\n"),
-    });
+    try {
+      await emailService.sendOrderEmail({
+        to: account.email,
+        subject: "Verifica il tuo indirizzo email PIX3LLAB",
+        text: [
+          `Il tuo codice di verifica e: ${code}`,
+          "",
+          "Inseriscilo nella tua area account entro 24 ore.",
+          "Se non hai richiesto tu questa verifica, puoi ignorare il messaggio.",
+          "",
+        ].join("\n"),
+      });
+    } catch (error) {
+      if (error instanceof EmailDailyLimitError) {
+        throw new AuthError(
+          "EMAIL_DAILY_LIMIT",
+          "Limite giornaliero di email raggiunto. Riprova domani.",
+          429,
+        );
+      }
+      throw error;
+    }
   }
 
   async function handleLogin(request, response, adminOnly = false) {
@@ -328,6 +340,27 @@ export function registerAccountRoutes(
         request.body?.emailNotificationsEnabled,
       );
       return response.json({ data: auth.serializeAccount(account) });
+    } catch (error) {
+      return sendAuthError(response, error);
+    }
+  });
+
+  app.delete("/api/account", auth.requireAccount, async (request, response) => {
+    let rateLimit;
+    try {
+      if (!disableRateLimits) {
+        rateLimit = checkRateLimit(
+          accountLoginAttempts,
+          `delete:${request.ip}:${request.userAccount.id}`,
+          MAX_LOGIN_ATTEMPTS,
+          "Troppi tentativi. Riprova piu tardi.",
+        );
+        recordAttempt(accountLoginAttempts, rateLimit, LOGIN_WINDOW_MS);
+      }
+      await auth.deleteAccount(request.userAccount.id, request.body?.password);
+      if (!disableRateLimits && rateLimit) accountLoginAttempts.delete(rateLimit.key);
+      auth.logout(request, response);
+      return response.status(204).end();
     } catch (error) {
       return sendAuthError(response, error);
     }

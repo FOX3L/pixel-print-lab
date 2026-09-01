@@ -1,5 +1,14 @@
 import nodemailer from "nodemailer";
 
+export const DEFAULT_DAILY_EMAIL_LIMIT = 100;
+
+export class EmailDailyLimitError extends Error {
+  constructor() {
+    super("Limite giornaliero di email raggiunto.");
+    this.code = "EMAIL_DAILY_LIMIT";
+  }
+}
+
 function optionalText(value) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -48,6 +57,53 @@ export function createEmailService(
       if (!transport) throw new Error("SMTP non configurato.");
       if (!to) throw new Error("Destinatario email non configurato.");
       await transport.sendMail({ from, to, subject, text });
+    },
+  });
+}
+
+export function createDailyLimitedEmailService(
+  database,
+  emailService,
+  dailyLimit = DEFAULT_DAILY_EMAIL_LIMIT,
+) {
+  if (!database) throw new TypeError("createDailyLimitedEmailService richiede una connessione al database");
+  if (!Number.isInteger(dailyLimit) || dailyLimit < 1) {
+    throw new TypeError("Il limite giornaliero delle email deve essere un intero positivo");
+  }
+  const reserveSend = database.prepare(`
+    INSERT INTO email_daily_usage (usage_date, sent_count)
+    VALUES (?, 1)
+    ON CONFLICT(usage_date) DO UPDATE SET
+      sent_count = sent_count + 1,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE sent_count < ?
+  `);
+  const releaseSend = database.prepare(`
+    UPDATE email_daily_usage
+    SET sent_count = MAX(0, sent_count - 1), updated_at = CURRENT_TIMESTAMP
+    WHERE usage_date = ?
+  `);
+  const deleteOldUsage = database.prepare(`
+    DELETE FROM email_daily_usage WHERE usage_date < ?
+  `);
+
+  return Object.freeze({
+    get configured() {
+      return Boolean(emailService?.configured);
+    },
+    get recipient() {
+      return emailService?.recipient ?? null;
+    },
+    async sendOrderEmail(message) {
+      const usageDate = new Date().toISOString().slice(0, 10);
+      deleteOldUsage.run(usageDate);
+      if (!reserveSend.run(usageDate, dailyLimit).changes) throw new EmailDailyLimitError();
+      try {
+        await emailService.sendOrderEmail(message);
+      } catch (error) {
+        releaseSend.run(usageDate);
+        throw error;
+      }
     },
   });
 }

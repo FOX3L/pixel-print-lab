@@ -725,6 +725,17 @@
     flex-direction: column;
   }
 
+  .account-delete form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .account-delete label,
+  .account-delete input,
+  .account-delete button {
+    width: 100%;
+  }
+
   .account-email-verification label,
   .account-email-verification input,
   .account-email-verification button {

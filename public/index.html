@@ -498,9 +498,20 @@
             </div>
             <div class="account-profile__actions">
               <a class="account-admin-link" id="account-admin-link" href="/admin.html" hidden>Control Room</a>
+              <button class="account-delete-button" id="account-delete-open" type="button">Elimina profilo</button>
               <button id="account-logout" type="button">Esci</button>
             </div>
           </div>
+          <section class="account-delete" id="account-delete" aria-labelledby="account-delete-title" hidden>
+            <h3 id="account-delete-title">Elimina definitivamente il profilo</h3>
+            <p>Account, sessioni ed email verranno eliminati. Gli ordini resteranno conservati come ordini ospite con nome e cognome originali.</p>
+            <form id="account-delete-form">
+              <label for="account-delete-password"><span>Password attuale</span><input id="account-delete-password" name="password" type="password" autocomplete="current-password" required></label>
+              <button type="submit">Conferma eliminazione</button>
+              <button id="account-delete-cancel" type="button">Annulla</button>
+            </form>
+            <p class="account-feedback" id="account-delete-feedback" role="status"></p>
+          </section>
           <section class="account-email-verification" id="account-email-verification" aria-labelledby="account-email-verification-title" hidden>
             <h3 id="account-email-verification-title">Verifica la tua email</h3>
             <p>Inserisci il codice di 16 caratteri ricevuto via email. Scade dopo 24 ore.</p>

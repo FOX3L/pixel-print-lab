@@ -8,6 +8,7 @@ import { registerAdminRoutes } from "./admin-routes.js";
 import { registerCatalogAssetServing } from "./catalog-assets.js";
 import { createAuthService } from "./auth-service.js";
 import { registerAccountRoutes } from "./account-routes.js";
+import { createDailyLimitedEmailService } from "./email-service.js";
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 const publicDirectory = path.join(currentDirectory, "..", "public");
@@ -35,6 +36,7 @@ export function createApp({
 
   const app = express();
   const auth = createAuthService({ database, adminEmail, adminPassword });
+  const limitedEmailService = createDailyLimitedEmailService(database, emailService);
 
   app.disable("x-powered-by");
   app.use((request, response, next) => {
@@ -67,14 +69,14 @@ export function createApp({
     database,
     auth,
     orderFileDirectory,
-    emailService,
+    emailService: limitedEmailService,
     disableRateLimits: disableAuthRateLimits,
   });
   registerOrderRoutes(app, {
     database,
     uploadDirectory,
     orderFileDirectory,
-    emailService,
+    emailService: limitedEmailService,
     optionalAccount: auth.optionalAccount,
     orderRateLimit,
   });
@@ -83,7 +85,7 @@ export function createApp({
     requireAdmin: auth.requireAdmin,
     catalogDirectory,
     orderFileDirectory,
-    emailService,
+    emailService: limitedEmailService,
     authService: auth,
   });
 

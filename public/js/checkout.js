@@ -37,6 +37,8 @@ export function initCheckout({ onOrderCreated, onSessionExpired } = {}) {
   const checkoutDialogBackdrop = document.querySelector("#checkout-dialog-backdrop");
   const checkoutFormView = document.querySelector("#checkout-form-view");
   const checkoutForm = document.querySelector("#checkout-form");
+  const firstNameField = checkoutForm.elements.firstName.closest("label");
+  const lastNameField = checkoutForm.elements.lastName.closest("label");
   const checkoutFeedback = document.querySelector("#checkout-feedback");
   const checkoutSubmitButton = document.querySelector("#checkout-submit");
   const orderConfirmation = document.querySelector("#order-confirmation");
@@ -47,7 +49,10 @@ export function initCheckout({ onOrderCreated, onSessionExpired } = {}) {
 
   checkoutOpenButton.addEventListener("click", () => {
     checkoutForm.reset();
-    if (state.currentAccount) {
+    const authenticated = Boolean(state.currentAccount);
+    firstNameField.hidden = authenticated;
+    lastNameField.hidden = authenticated;
+    if (authenticated) {
       checkoutForm.elements.firstName.value = state.currentAccount.firstName;
       checkoutForm.elements.lastName.value = state.currentAccount.lastName;
     }
@@ -59,7 +64,7 @@ export function initCheckout({ onOrderCreated, onSessionExpired } = {}) {
     cartDialog.close();
     checkoutDialogBackdrop.hidden = false;
     checkoutDialog.show();
-    checkoutForm.elements.firstName.focus();
+    (authenticated ? checkoutForm.elements.comment : checkoutForm.elements.firstName).focus();
   });
   checkoutDialog.addEventListener("close", () => {
     checkoutDialogBackdrop.hidden = true;

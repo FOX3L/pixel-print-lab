@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.11.0] - 2026-09-02
+
+### Added
+
+- Eliminazione definitiva del profilo cliente con conferma della password, revoca delle sessioni e conservazione degli ordini come richieste ospite.
+- Limite globale persistente di 100 email al giorno, con ripristino della quota per gli invii SMTP falliti.
+- Icona pixel art della moneta Pix tra gli asset del brand.
+
+### Changed
+
+- Nascosti nome e cognome nel checkout degli utenti autenticati, continuando a richiederli agli ospiti.
+
+### Migration notes
+
+- La migrazione database `23` aggiunge il contatore giornaliero persistente degli invii email.
+
 ## [1.10.0] - 2026-09-01
 
 ### Added

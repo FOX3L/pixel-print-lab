@@ -452,6 +452,17 @@ const migrations = [
         ON password_reset_tokens (expires_at);
     `,
   },
+  {
+    version: 23,
+    name: "add_daily_email_usage",
+    sql: `
+      CREATE TABLE email_daily_usage (
+        usage_date TEXT PRIMARY KEY,
+        sent_count INTEGER NOT NULL DEFAULT 0 CHECK (sent_count >= 0),
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `,
+  },
 ];
 
 const products = [

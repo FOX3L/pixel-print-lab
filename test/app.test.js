@@ -13,7 +13,11 @@ import {
   UPLOAD_TTL_MS,
 } from "../src/custom-model-routes.js";
 import { migrateDatabase, openDatabase, seedDatabase } from "../src/database.js";
-import { createEmailService } from "../src/email-service.js";
+import {
+  createDailyLimitedEmailService,
+  createEmailService,
+  EmailDailyLimitError,
+} from "../src/email-service.js";
 import { create3mfCubeBuffer, createInvalid3mfBuffer } from "./helpers/3mf.js";
 
 let server;
@@ -203,6 +207,8 @@ test("serve la pagina pubblica con un catalogo accessibile", async () => {
   assert.match(page, /id="account-email-notifications" type="checkbox"/);
   assert.match(page, /id="account-password-forgot"/);
   assert.match(page, /id="account-password-reset-form"/);
+  assert.match(page, /id="account-delete-open"/);
+  assert.match(page, /id="account-delete-form"/);
   assert.match(page, /id="confirmation-code"/);
   assert.match(page, /type="importmap"/);
   assert.match(page, /<script type="module" src="\/app.js(\?v=[^"]+)?"><\/script>/);
@@ -278,6 +284,35 @@ test("riconosce e usa una configurazione SMTP completa", async () => {
   });
 });
 
+test("limita gli invii email giornalieri senza contare quelli falliti", async () => {
+  const emailDatabase = openDatabase(":memory:");
+  let fail = false;
+  const delivered = [];
+  const limitedService = createDailyLimitedEmailService(emailDatabase, {
+    configured: true,
+    recipient: "ordini@example.test",
+    async sendOrderEmail(message) {
+      if (fail) throw new Error("SMTP non disponibile");
+      delivered.push(message);
+    },
+  }, 2);
+  try {
+    await limitedService.sendOrderEmail({ subject: "Prima" });
+    fail = true;
+    await assert.rejects(limitedService.sendOrderEmail({ subject: "Fallita" }), /SMTP non disponibile/);
+    fail = false;
+    await limitedService.sendOrderEmail({ subject: "Seconda" });
+    await assert.rejects(
+      limitedService.sendOrderEmail({ subject: "Oltre limite" }),
+      EmailDailyLimitError,
+    );
+    assert.deepEqual(delivered.map(({ subject }) => subject), ["Prima", "Seconda"]);
+    assert.equal(emailDatabase.prepare("SELECT sent_count FROM email_daily_usage").get().sent_count, 2);
+  } finally {
+    emailDatabase.close();
+  }
+});
+
 test("espone i prodotti visibili ordinati", async () => {
   const response = await fetch(`${baseUrl}/api/products`);
   const body = await response.json();
@@ -322,7 +357,7 @@ test("il seed puo essere eseguito piu volte senza duplicare dati", () => {
 
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM products").get().count, 2);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM colors").get().count, 4);
-  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 22);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 23);
   assert.ok(database.prepare("SELECT email_verified_at FROM user_accounts LIMIT 1"));
   assert.equal(database.prepare("SELECT email_notifications_enabled FROM app_settings WHERE id = 1").get().email_notifications_enabled, 0);
 });
@@ -386,7 +421,7 @@ test("migra un catalogo esistente senza perdere dati e impedisce il riuso degli 
     assert.equal(legacyDatabase.prepare("SELECT model_format FROM order_items WHERE id = 1").get().model_format, "stl");
     assert.equal(legacyDatabase.prepare("SELECT status FROM orders WHERE id = 1").get().status, "in_attesa");
     assert.equal(legacyDatabase.prepare("SELECT comment FROM orders WHERE id = 1").get().comment, null);
-    assert.equal(legacyDatabase.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 22);
+    assert.equal(legacyDatabase.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count, 23);
     assert.equal(legacyDatabase.prepare("SELECT COUNT(*) AS count FROM email_verification_tokens").get().count, 0);
     assert.equal(legacyDatabase.prepare("SELECT email_notifications_enabled FROM app_settings WHERE id = 1").get().email_notifications_enabled, 0);
     assert.equal(legacyDatabase.prepare("SELECT admin_username FROM app_settings WHERE id = 1").get().admin_username, null);
@@ -1584,6 +1619,16 @@ test("gestisce account, storico personale e accesso amministrativo unificato", a
     body: JSON.stringify({ status: "in_attesa" }),
   });
 
+  const usageDate = new Date().toISOString().slice(0, 10);
+  database.prepare(`
+    INSERT INTO email_daily_usage (usage_date, sent_count) VALUES (?, 100)
+    ON CONFLICT(usage_date) DO UPDATE SET sent_count = 100
+  `).run(usageDate);
+  const limitedResend = await accountFetch("/api/account/email/resend", { method: "POST" });
+  assert.equal(limitedResend.status, 429);
+  assert.equal((await limitedResend.json()).error.code, "EMAIL_DAILY_LIMIT");
+  database.prepare("DELETE FROM email_daily_usage WHERE usage_date = ?").run(usageDate);
+
   const resendVerification = await accountFetch("/api/account/email/resend", { method: "POST" });
   assert.equal(resendVerification.status, 204);
   const resentVerificationCode = sentEmails.at(-1).text.match(/[A-F0-9]{16}/)?.[0];
@@ -1886,6 +1931,73 @@ test("recupera la password senza rivelare gli account registrati", async () => {
   });
   assert.equal(newPasswordLogin.status, 201);
   database.prepare("DELETE FROM user_accounts WHERE id = ?").run(account.id);
+});
+
+test("elimina il profilo cliente conservando gli ordini come ospite", async () => {
+  const registration = await fetch(`${baseUrl}/api/account/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      email: "elimina.profilo@example.test",
+      password: "password-profilo-sicura",
+      firstName: "Elimina",
+      lastName: "Profilo",
+    }),
+  });
+  const account = (await registration.json()).data;
+  const cookie = registration.headers.get("set-cookie").split(";", 1)[0];
+  const accountFetch = (pathName, options = {}) => fetch(`${baseUrl}${pathName}`, {
+    ...options,
+    headers: { cookie, ...(options.headers ?? {}) },
+  });
+  assert.equal(registration.status, 201);
+
+  const orderResponse = await accountFetch("/api/orders", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      firstName: "Elimina",
+      lastName: "Profilo",
+      items: [{ type: "catalog", productId: 1, colorId: 1, quantity: 1 }],
+    }),
+  });
+  const order = (await orderResponse.json()).data;
+  const savedOrder = database.prepare("SELECT * FROM orders WHERE code = ?").get(order.code);
+  assert.equal(savedOrder.user_account_id, account.id);
+
+  const wrongPassword = await accountFetch("/api/account", {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password: "password-errata" }),
+  });
+  assert.equal(wrongPassword.status, 401);
+  assert.ok(database.prepare("SELECT id FROM user_accounts WHERE id = ?").get(account.id));
+
+  const adminCookie = await authenticateAdmin();
+  const adminDelete = await fetch(`${baseUrl}/api/account`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json", cookie: adminCookie },
+    body: JSON.stringify({ password: "test-admin-password" }),
+  });
+  assert.equal(adminDelete.status, 403);
+  assert.equal((await adminDelete.json()).error.code, "ACCOUNT_DELETE_FORBIDDEN");
+
+  const deletion = await accountFetch("/api/account", {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password: "password-profilo-sicura" }),
+  });
+  assert.equal(deletion.status, 204);
+  assert.match(deletion.headers.get("set-cookie"), /Max-Age=0/);
+  assert.equal(database.prepare("SELECT id FROM user_accounts WHERE id = ?").get(account.id), undefined);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM email_verification_tokens WHERE user_account_id = ?").get(account.id).count, 0);
+  const preservedOrder = database.prepare("SELECT * FROM orders WHERE id = ?").get(savedOrder.id);
+  assert.equal(preservedOrder.user_account_id, null);
+  assert.equal(preservedOrder.first_name, "Elimina");
+  assert.equal(preservedOrder.last_name, "Profilo");
+  assert.equal((await accountFetch("/api/account/session")).status, 401);
+  database.prepare("DELETE FROM orders WHERE id = ?").run(savedOrder.id);
+  await fetch(`${baseUrl}/api/account/logout`, { method: "POST", headers: { cookie: adminCookie } });
 });
 
 test("protegge le API amministrative e gestisce il ciclo completo di un ordine", async () => {
