@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.9.1] - 2026-09-01
+
+### Fixed
+
+- Consentita la validazione di `compose.yml` senza un file `.env`, mantenendo `ADMIN_EMAIL` e `ADMIN_PASSWORD` configurabili esplicitamente tramite Compose.
+
 ## [1.9.0] - 2026-09-01
 
 ### Added
