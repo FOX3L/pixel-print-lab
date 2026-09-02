@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.13.1] - 2026-09-02
+
+### Fixed
+
+- Accettati i progetti 3MF Bambu Studio con parti secondarie `.model` vuote, senza indebolire la validazione del modello principale.
+
 ## [1.13.0] - 2026-09-02
 
 ### Added

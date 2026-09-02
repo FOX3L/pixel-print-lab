@@ -215,7 +215,7 @@ function parsePositiveId(value, label) {
   return id;
 }
 
-function parseModel(buffer, { requireBuild = true } = {}) {
+function parseModel(buffer, { requireBuild = true, allowEmpty = false } = {}) {
   const objects = new Map();
   const buildItems = [];
   const metadata = {};
@@ -282,7 +282,7 @@ function parseModel(buffer, { requireBuild = true } = {}) {
       }
     },
   });
-  if (!objects.size || (requireBuild && !buildItems.length)) throw new ModelFileError("INVALID_3MF_GEOMETRY", "Il 3MF non contiene oggetti da stampare.");
+  if ((!allowEmpty && !objects.size) || (requireBuild && !buildItems.length)) throw new ModelFileError("INVALID_3MF_GEOMETRY", "Il 3MF non contiene oggetti da stampare.");
   for (const object of objects.values()) {
     for (const triangle of object.triangles) {
       if (triangle.some((index) => !Number.isInteger(index) || index < 0 || index >= object.vertices.length)) {
@@ -426,7 +426,7 @@ async function load3mfModel(filename) {
   let totalComponents = [...model.objects.values()].reduce((total, object) => total + object.components.length, 0);
   for (const partName of modelPartNames) {
     if (partName === modelPartName) continue;
-    const part = parseModel(entries.get(partName).content, { requireBuild: false });
+    const part = parseModel(entries.get(partName).content, { requireBuild: false, allowEmpty: true });
     if (part.unit !== model.unit) throw new ModelFileError("UNSUPPORTED_3MF_MULTIPART", "Le parti modello del 3MF usano unita di misura differenti.");
     for (const [id, object] of part.objects) {
       if (model.objects.has(id)) throw new ModelFileError("AMBIGUOUS_3MF_OBJECT", "Le parti modello del 3MF riutilizzano identificativi oggetto ambigui.");

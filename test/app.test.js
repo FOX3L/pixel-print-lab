@@ -85,7 +85,7 @@ async function authenticateAdmin() {
   return response.headers.get("set-cookie").split(";", 1)[0];
 }
 
-function create3mfBuffer({ bambu = false, gcode = false, malformedModel = false, modelOverride, secondaryModel, firstSize = [20, 30, 40], repeatFirstObject = false, secondTransform = "1 0 0 0 1 0 0 0 1 250 0 0" } = {}) {
+function create3mfBuffer({ bambu = false, gcode = false, malformedModel = false, modelOverride, secondaryModel, emptySecondaryModel = false, firstSize = [20, 30, 40], repeatFirstObject = false, secondTransform = "1 0 0 0 1 0 0 0 1 250 0 0" } = {}) {
   const secondBuildObjectId = repeatFirstObject ? 1 : 2;
   const model = modelOverride ?? (malformedModel ? "<model><broken>" : `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
@@ -119,6 +119,8 @@ function create3mfBuffer({ bambu = false, gcode = false, malformedModel = false,
   zip.addBuffer(Buffer.from(relationships), "_rels/.rels");
   zip.addBuffer(Buffer.from(model), "3D/3dmodel.model");
   if (secondaryModel) zip.addBuffer(Buffer.from(secondaryModel), "3D/Objects/secondary.model");
+  if (emptySecondaryModel) zip.addBuffer(Buffer.from(`<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><resources/></model>`), "3D/Objects/empty.model");
   if (bambu) {
     const plateConfig = `<?xml version="1.0" encoding="UTF-8"?>
 <config>
@@ -1523,6 +1525,12 @@ test("accetta un modello 3MF per i prodotti del catalogo", async () => {
   assert.match(created.modelUrl, /^\/catalog-assets\/[0-9a-f-]+\.3mf$/);
   assert.equal((await fetch(`${baseUrl}${created.modelUrl}`)).status, 200);
 
+  const emptyPartForm = buildForm();
+  emptyPartForm.append("model", new Blob([await create3mfBuffer({ emptySecondaryModel: true })]), "con-parte-vuota.3mf");
+  const emptyPartResponse = await adminFetch("/api/admin/products", { method: "POST", body: emptyPartForm });
+  const emptyPart = (await emptyPartResponse.json()).data;
+  assert.equal(emptyPartResponse.status, 201);
+
   const malformedForm = buildForm();
   malformedForm.append("model", new Blob(["non un archivio"]), "rotto.3mf");
   const malformedResponse = await adminFetch("/api/admin/products", { method: "POST", body: malformedForm });
@@ -1530,6 +1538,7 @@ test("accetta un modello 3MF per i prodotti del catalogo", async () => {
   assert.equal((await malformedResponse.json()).error.code, "INVALID_CATALOG_MODEL");
 
   assert.equal((await adminFetch(`/api/admin/products/${created.id}`, { method: "DELETE" })).status, 204);
+  assert.equal((await adminFetch(`/api/admin/products/${emptyPart.id}`, { method: "DELETE" })).status, 204);
   await assert.rejects(stat(path.join(catalogDirectory, path.basename(created.modelUrl))), { code: "ENOENT" });
 });
 
