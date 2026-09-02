@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.12.1] - 2026-09-02
+
+### Changed
+
+- Aggiunto un helper accessibile sull'icona Pix e riordinati i vantaggi dell'account, evidenziando punti fedelta e premio esclusivo a 10 Pix.
+- Rimossa dalla Control Room la modifica delle credenziali amministrative; la configurazione resta affidata alle variabili d'ambiente.
+
 ## [1.12.0] - 2026-09-02
 
 ### Added
