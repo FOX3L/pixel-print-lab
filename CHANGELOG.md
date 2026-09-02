@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.13.0] - 2026-09-02
+
+### Added
+
+- Eliminazione dei profili cliente dalla schermata Pix della Control Room, con conferma esplicita, revoca delle sessioni e conservazione degli ordini come richieste ospite.
+
+### Fixed
+
+- Il seed iniziale non ricrea piu colori o prodotti rimossi manualmente da una palette o catalogo gia configurati.
+
 ## [1.12.2] - 2026-09-02
 
 ### Fixed

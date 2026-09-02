@@ -443,6 +443,18 @@ export function registerAdminRoutes(
     });
   });
 
+  app.delete("/api/admin/accounts/:id", requireAdmin, (request, response) => {
+    try {
+      if (!/^\d+$/.test(request.params.id)) {
+        throw new AuthError("ACCOUNT_NOT_FOUND", "Profilo cliente non trovato.", 404);
+      }
+      authService.deleteCustomerAccount(Number(request.params.id));
+      return response.status(204).end();
+    } catch (error) {
+      return sendError(response, error);
+    }
+  });
+
   app.post("/api/admin/products", requireAdmin, (request, response) => {
     handleProductUpload(request, response, null);
   });

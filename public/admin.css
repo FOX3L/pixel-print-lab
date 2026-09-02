@@ -1208,7 +1208,7 @@
 .pix-profile-card {
   padding: 0.85rem;
   display: grid;
-  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+  grid-template-columns: 3.5rem minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 0.85rem;
   background: var(--paper);
@@ -1248,6 +1248,20 @@
   color: var(--orange);
   font-family: "Dogica Bold", "Dogica", monospace;
   font-size: 1.35rem;
+}
+
+.pix-profile-card__delete {
+  padding: 0.55rem 0.7rem;
+  color: var(--paper);
+  background: #b63627;
+  border: 2px solid var(--ink);
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.pix-profile-card__delete:disabled {
+  opacity: 0.5;
 }
 
 @media (max-width: 900px) {
@@ -1364,7 +1378,7 @@
   }
 
   .pix-profile-card {
-    grid-template-columns: 3rem minmax(0, 1fr) auto;
+    grid-template-columns: 3rem minmax(0, 1fr) auto auto;
   }
 
   .pix-profile-card > img {

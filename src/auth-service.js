@@ -423,6 +423,14 @@ export function createAuthService({ database, adminEmail, adminPassword }) {
     deleteLocalAccount.run(account.id);
   }
 
+  function deleteCustomerAccount(accountId) {
+    const account = findAccountById.get(accountId);
+    if (!account || account.auth_source !== "local" || account.role !== "customer") {
+      throw new AuthError("ACCOUNT_NOT_FOUND", "Profilo cliente non trovato.", 404);
+    }
+    deleteLocalAccount.run(account.id);
+  }
+
   async function register({ password: rawPassword, firstName, lastName, email: rawEmail }) {
     const email = validateOptionalEmail(rawEmail)?.toLowerCase();
     if (!email) throw new AuthError("INVALID_EMAIL", "L'indirizzo email e obbligatorio.");
@@ -600,6 +608,7 @@ export function createAuthService({ database, adminEmail, adminPassword }) {
     createPasswordReset,
     resetPassword,
     deleteAccount,
+    deleteCustomerAccount,
     isAdminEmail: (username) => {
       const adminEmail = effectiveAdminEmail();
       return adminEmail.length > 0 && normalizeUsername(username) === adminEmail;

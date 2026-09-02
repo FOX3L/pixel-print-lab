@@ -558,6 +558,11 @@ export function migrateDatabase(database) {
 }
 
 export function seedDatabase(database) {
+  const catalogEntryCount = database.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM products) +
+      (SELECT COUNT(*) FROM colors) AS count
+  `);
   const insertProduct = database.prepare(`
     INSERT INTO products (
       code, name, description, price_cents, image_url, material, model_url
@@ -573,6 +578,7 @@ export function seedDatabase(database) {
   `);
 
   database.transaction(() => {
+    if (catalogEntryCount.get().count > 0) return;
     for (const product of products) {
       insertProduct.run(product);
     }

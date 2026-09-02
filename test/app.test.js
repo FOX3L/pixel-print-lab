@@ -259,6 +259,7 @@ test("mostra i dettagli amministrativi dell'ordine in sola lettura", async () =>
   assert.match(page, /data-view="pix"/);
   assert.match(page, /id="pix-view"/);
   assert.match(page, /id="pix-profile-template"/);
+  assert.match(page, /data-field="pix-delete"/);
 });
 
 test("riconosce e usa una configurazione SMTP completa", async () => {
@@ -373,6 +374,21 @@ test("il seed puo essere eseguito piu volte senza duplicare dati", () => {
   assert.ok(database.prepare("SELECT pix_balance FROM user_accounts LIMIT 1"));
   assert.ok(database.prepare("SELECT pix_awarded_at FROM orders LIMIT 1"));
   assert.equal(database.prepare("SELECT email_notifications_enabled FROM app_settings WHERE id = 1").get().email_notifications_enabled, 0);
+});
+
+test("il seed non ripristina i colori eliminati", () => {
+  const seededDatabase = openDatabase(":memory:");
+  try {
+    seedDatabase(seededDatabase);
+    seededDatabase.prepare("DELETE FROM colors WHERE name = 'Arancione'").run();
+
+    seedDatabase(seededDatabase);
+
+    assert.equal(seededDatabase.prepare("SELECT COUNT(*) AS count FROM colors").get().count, 3);
+    assert.equal(seededDatabase.prepare("SELECT id FROM colors WHERE name = 'Arancione'").get(), undefined);
+  } finally {
+    seededDatabase.close();
+  }
 });
 
 test("migra un catalogo esistente senza perdere dati e impedisce il riuso degli ID", () => {
@@ -2094,6 +2110,58 @@ test("elimina il profilo cliente conservando gli ordini come ospite", async () =
   assert.equal(preservedOrder.first_name, "Elimina");
   assert.equal(preservedOrder.last_name, "Profilo");
   assert.equal((await accountFetch("/api/account/session")).status, 401);
+  database.prepare("DELETE FROM orders WHERE id = ?").run(savedOrder.id);
+  await fetch(`${baseUrl}/api/account/logout`, { method: "POST", headers: { cookie: adminCookie } });
+});
+
+test("l'amministratore elimina un profilo cliente dalla schermata Pix", async () => {
+  const registration = await fetch(`${baseUrl}/api/account/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      email: "elimina.pix@example.test",
+      password: "password-pix-sicura",
+      firstName: "Elimina",
+      lastName: "Pix",
+    }),
+  });
+  const account = (await registration.json()).data;
+  const accountCookie = registration.headers.get("set-cookie").split(";", 1)[0];
+  const accountFetch = (pathName, options = {}) => fetch(`${baseUrl}${pathName}`, {
+    ...options,
+    headers: { cookie: accountCookie, ...(options.headers ?? {}) },
+  });
+  const orderResponse = await accountFetch("/api/orders", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      firstName: "Elimina",
+      lastName: "Pix",
+      items: [{ type: "catalog", productId: 1, colorId: 1, quantity: 1 }],
+    }),
+  });
+  const order = (await orderResponse.json()).data;
+  const savedOrder = database.prepare("SELECT * FROM orders WHERE code = ?").get(order.code);
+  const adminCookie = await authenticateAdmin();
+  const adminFetch = (pathName, options = {}) => fetch(`${baseUrl}${pathName}`, {
+    ...options,
+    headers: { cookie: adminCookie, ...(options.headers ?? {}) },
+  });
+
+  assert.equal((await fetch(`${baseUrl}/api/admin/accounts/${account.id}`, { method: "DELETE" })).status, 401);
+  const adminId = database.prepare("SELECT id FROM user_accounts WHERE role = 'admin'").get().id;
+  const adminDeletion = await adminFetch(`/api/admin/accounts/${adminId}`, { method: "DELETE" });
+  assert.equal(adminDeletion.status, 404);
+  assert.equal((await adminDeletion.json()).error.code, "ACCOUNT_NOT_FOUND");
+
+  const deletion = await adminFetch(`/api/admin/accounts/${account.id}`, { method: "DELETE" });
+  assert.equal(deletion.status, 204);
+  assert.equal(database.prepare("SELECT id FROM user_accounts WHERE id = ?").get(account.id), undefined);
+  assert.equal(database.prepare("SELECT user_account_id FROM orders WHERE id = ?").get(savedOrder.id).user_account_id, null);
+  assert.equal((await accountFetch("/api/account/session")).status, 401);
+  const pixProfiles = (await (await adminFetch("/api/admin/pix")).json()).data;
+  assert.equal(pixProfiles.some((profile) => profile.id === account.id), false);
+
   database.prepare("DELETE FROM orders WHERE id = ?").run(savedOrder.id);
   await fetch(`${baseUrl}/api/account/logout`, { method: "POST", headers: { cookie: adminCookie } });
 });

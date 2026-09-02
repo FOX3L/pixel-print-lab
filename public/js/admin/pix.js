@@ -14,6 +14,21 @@ export function initPix({ api }) {
       card.querySelector('[data-field="pix-name"]').textContent = `${profile.firstName} ${profile.lastName}`;
       card.querySelector('[data-field="pix-email"]').textContent = profile.email;
       card.querySelector('[data-field="pix-balance"]').textContent = profile.pixBalance;
+      card.querySelector('[data-field="pix-delete"]').addEventListener("click", async () => {
+        if (!confirm(`Eliminare definitivamente il profilo di ${profile.firstName} ${profile.lastName}? Gli ordini resteranno conservati come richieste ospite.`)) return;
+        const deleteButton = card.querySelector('[data-field="pix-delete"]');
+        deleteButton.disabled = true;
+        feedback.textContent = "";
+        feedback.classList.remove("admin-feedback--error");
+        try {
+          await api(`/api/admin/accounts/${profile.id}`, { method: "DELETE" });
+          await loadPix();
+        } catch (error) {
+          feedback.textContent = error.message;
+          feedback.classList.add("admin-feedback--error");
+          deleteButton.disabled = false;
+        }
+      });
       return card;
     }));
     feedback.textContent = profiles.length ? "" : "Nessun profilo registrato.";
