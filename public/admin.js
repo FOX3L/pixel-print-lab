@@ -24,6 +24,6 @@ const auth = initAuth({
 });
 apiHooks.onUnauthorized = () => auth.showLogin();
 
-initSettings({ api, onCredentialsSaved: (message) => auth.showLogin(message) });
+initSettings({ api });
 
 auth.boot();

@@ -300,12 +300,7 @@
   padding: 1.25rem;
 }
 
-#credentials-form {
-  padding: 0 1.25rem 1.25rem;
-}
-
-.settings-email,
-.settings-account {
+.settings-email {
   padding: 1rem;
   background: var(--panel);
   border: 3px solid var(--ink);

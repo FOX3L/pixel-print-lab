@@ -293,28 +293,6 @@
           <p class="admin-feedback" id="settings-feedback" role="status"></p>
           <button class="save-order settings-save" type="submit">Salva impostazioni</button>
         </form>
-        <form id="credentials-form">
-          <section class="settings-account" aria-labelledby="settings-account-title">
-            <p class="section-number">Accesso</p>
-            <h3 id="settings-account-title">Credenziali amministrative</h3>
-            <label class="settings-field">
-              <span>Email</span>
-              <input id="credentials-email" name="email" type="email" autocomplete="email" required>
-            </label>
-            <label class="settings-field">
-              <span>Password attuale</span>
-              <input id="credentials-current-password" name="currentPassword" type="password" autocomplete="current-password" required>
-            </label>
-            <label class="settings-field">
-              <span>Nuova password</span>
-              <input id="credentials-new-password" name="password" type="password" autocomplete="new-password" minlength="10" aria-describedby="credentials-password-hint">
-            </label>
-            <p class="settings-hint" id="credentials-password-hint">Lascia vuota la nuova password per cambiare soltanto l'email. Dopo il salvataggio dovrai accedere di nuovo; le sessioni attive vengono chiuse.</p>
-            <p class="settings-hint">Se dimentichi le credenziali personalizzate, il comando <code>npm run admin:reset</code> ripristina quelle delle variabili d'ambiente.</p>
-          </section>
-          <p class="admin-feedback" id="credentials-feedback" role="status"></p>
-          <button class="save-order settings-save" type="submit">Aggiorna credenziali</button>
-        </form>
       </div>
     </dialog>
 

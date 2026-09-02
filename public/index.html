@@ -419,11 +419,12 @@
         <h2 id="guest-order-title">Con un account tieni tutto a portata di mano.</h2>
         <p>Puoi comunque ordinare come ospite. Registrandoti, invece, ritrovi nello storico il codice, lo stato e i dettagli delle tue richieste.</p>
         <ul>
+          <li>1 Pix per ogni ordine consegnato, verso un premio esclusivo a 10 Pix</li>
           <li>Storico personale degli ordini</li>
-          <li>Nome e cognome gia compilati nei prossimi ordini</li>
           <li>Stato e preventivi sempre consultabili</li>
           <li>Avviso email quando l'ordine entra in lavorazione</li>
           <li>Gestione delle tue richieste da un unico spazio</li>
+          <li>Nome e cognome gia compilati nei prossimi ordini</li>
         </ul>
         <div class="guest-order-dialog__actions">
           <button id="guest-order-continue" type="button">Continua come ospite</button>
@@ -495,7 +496,10 @@
                 <span>Ricevi notifiche email sugli ordini</span>
               </label>
               <div class="account-pix" id="account-pix">
-                <img src="/brand/PIX.svg" alt="" aria-hidden="true">
+                <span class="account-pix__icon" tabindex="0" aria-describedby="account-pix-helper">
+                  <img src="/brand/PIX.svg" alt="" aria-hidden="true">
+                  <span class="account-pix__helper" id="account-pix-helper" role="tooltip">I Pix sono punti fedelta: ogni ordine consegnato vale 1 Pix. Al raggiungimento di 10 Pix riceverai un premio esclusivo.</span>
+                </span>
                 <div><span>I tuoi Pix</span><strong id="account-pix-balance">0</strong></div>
               </div>
               <p class="account-feedback" id="account-preferences-feedback" role="status"></p>

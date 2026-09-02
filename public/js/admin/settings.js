@@ -1,6 +1,6 @@
 const pricingCentsFields = new Set(["filamentPriceCentsPerKg", "energyPriceCentsPerKwh", "machineHourlyCostCents", "minQuoteCents"]);
 
-export function initSettings({ api, onCredentialsSaved }) {
+export function initSettings({ api }) {
   const settingsButton = document.querySelector("#settings-button");
   const settingsDialog = document.querySelector("#settings-dialog");
   const settingsDialogBackdrop = document.querySelector("#settings-dialog-backdrop");
@@ -22,11 +22,6 @@ export function initSettings({ api, onCredentialsSaved }) {
     markupPercent: document.querySelector("#pricing-markup"),
     minQuoteCents: document.querySelector("#pricing-min-quote"),
   };
-  const credentialsForm = document.querySelector("#credentials-form");
-  const credentialsEmail = document.querySelector("#credentials-email");
-  const credentialsCurrentPassword = document.querySelector("#credentials-current-password");
-  const credentialsNewPassword = document.querySelector("#credentials-new-password");
-  const credentialsFeedback = document.querySelector("#credentials-feedback");
 
   async function loadSettings() {
     settingsFeedback.textContent = "";
@@ -42,10 +37,6 @@ export function initSettings({ api, onCredentialsSaved }) {
       const value = settings.pricing?.[field];
       input.value = pricingCentsFields.has(field) ? (value / 100).toFixed(2) : value;
     }
-    credentialsForm.reset();
-    credentialsEmail.value = settings.adminEmail;
-    credentialsFeedback.textContent = "";
-    credentialsFeedback.classList.remove("admin-feedback--error");
   }
 
   function readPricingForm() {
@@ -97,31 +88,6 @@ export function initSettings({ api, onCredentialsSaved }) {
     } catch (error) {
       settingsFeedback.textContent = error.message;
       settingsFeedback.classList.add("admin-feedback--error");
-    } finally {
-      submitButton.disabled = false;
-    }
-  });
-
-  credentialsForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const submitButton = credentialsForm.querySelector('[type="submit"]');
-    submitButton.disabled = true;
-    credentialsFeedback.textContent = "";
-    credentialsFeedback.classList.remove("admin-feedback--error");
-    try {
-      await api("/api/admin/credentials", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          email: credentialsEmail.value,
-          currentPassword: credentialsCurrentPassword.value,
-          password: credentialsNewPassword.value || undefined,
-        }),
-      });
-      onCredentialsSaved?.("Credenziali aggiornate. Accedi con le nuove credenziali.");
-    } catch (error) {
-      credentialsFeedback.textContent = error.message;
-      credentialsFeedback.classList.add("admin-feedback--error");
     } finally {
       submitButton.disabled = false;
     }

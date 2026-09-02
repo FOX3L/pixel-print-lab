@@ -787,18 +787,30 @@
   border: 2px solid var(--orange);
 }
 
-.account-pix img {
+.account-pix__icon {
+  position: relative;
+  display: block;
+  line-height: 0;
+  cursor: help;
+}
+
+.account-pix__icon:focus {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+}
+
+.account-pix__icon img {
   width: 3rem;
   height: 3rem;
   image-rendering: pixelated;
 }
 
-.account-pix div {
+.account-pix > div {
   display: grid;
   gap: 0.15rem;
 }
 
-.account-pix span {
+.account-pix > div > span {
   font-size: 0.58rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -809,6 +821,45 @@
   color: var(--blue);
   font-family: "Dogica Bold", "Dogica", monospace;
   font-size: 1.25rem;
+}
+
+.account-pix__helper {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  bottom: calc(100% + 0.8rem);
+  width: min(18rem, calc(100vw - 3rem));
+  padding: 0.75rem;
+  color: var(--paper);
+  background: var(--ink);
+  border: 2px solid var(--orange);
+  box-shadow: 4px 4px 0 var(--blue);
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.25rem);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.account-pix__helper::after {
+  position: absolute;
+  bottom: -0.45rem;
+  left: 1rem;
+  width: 0.7rem;
+  height: 0.7rem;
+  content: "";
+  background: var(--ink);
+  border-right: 2px solid var(--orange);
+  border-bottom: 2px solid var(--orange);
+  transform: rotate(45deg);
+}
+
+.account-pix__icon:hover .account-pix__helper,
+.account-pix__icon:focus .account-pix__helper {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .account-profile__actions {

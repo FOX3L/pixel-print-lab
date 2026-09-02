@@ -198,6 +198,7 @@ test("serve la pagina pubblica con un catalogo accessibile", async () => {
   assert.match(page, /id="guest-order-dialog"/);
   assert.match(page, /id="guest-order-continue"/);
   assert.match(page, /id="guest-order-account"/);
+  assert.match(page, /1 Pix per ogni ordine consegnato, verso un premio esclusivo a 10 Pix/);
   assert.match(page, /<textarea id="order-comment" name="comment"[^>]*maxlength="500"/);
   assert.match(page, /<input id="register-email" name="email" type="email"[^>]*maxlength="254"/);
   assert.match(page, /<input id="login-email" name="email" type="email"[^>]*maxlength="254"/);
@@ -210,6 +211,8 @@ test("serve la pagina pubblica con un catalogo accessibile", async () => {
   assert.match(page, /id="account-delete-open"/);
   assert.match(page, /id="account-delete-form"/);
   assert.match(page, /id="account-pix-balance"/);
+  assert.match(page, /id="account-pix-helper" role="tooltip"/);
+  assert.match(page, /Al raggiungimento di 10 Pix riceverai un premio esclusivo/);
   assert.match(page, /src="\/brand\/PIX\.svg"/);
   assert.match(page, /id="confirmation-code"/);
   assert.match(page, /type="importmap"/);
@@ -251,7 +254,7 @@ test("mostra i dettagli amministrativi dell'ordine in sola lettura", async () =>
   assert.match(page, /id="settings-dialog"/);
   assert.match(page, /id="email-notifications-enabled"/);
   assert.match(page, /id="admin-email" name="email" type="email"/);
-  assert.match(page, /id="credentials-email" name="email" type="email"/);
+  assert.doesNotMatch(page, /id="credentials-form"/);
   assert.match(page, /data-view="pix"/);
   assert.match(page, /id="pix-view"/);
   assert.match(page, /id="pix-profile-template"/);
