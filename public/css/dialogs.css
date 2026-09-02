@@ -837,6 +837,7 @@
   font-size: 0.66rem;
   font-weight: 700;
   line-height: 1.45;
+  visibility: hidden;
   opacity: 0;
   pointer-events: none;
   transform: translateY(0.25rem);
@@ -858,6 +859,7 @@
 
 .account-pix__icon:hover .account-pix__helper,
 .account-pix__icon:focus .account-pix__helper {
+  visibility: visible;
   opacity: 1;
   transform: translateY(0);
 }

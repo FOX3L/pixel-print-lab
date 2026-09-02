@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.12.2] - 2026-09-02
+
+### Fixed
+
+- Corretto il popup informativo dei Pix, nascosto dal layout normale e caricato con un cache-buster CSS aggiornato.
+
 ## [1.12.1] - 2026-09-02
 
 ### Changed

@@ -213,6 +213,7 @@ test("serve la pagina pubblica con un catalogo accessibile", async () => {
   assert.match(page, /id="account-pix-balance"/);
   assert.match(page, /id="account-pix-helper" role="tooltip"/);
   assert.match(page, /Al raggiungimento di 10 Pix riceverai un premio esclusivo/);
+  assert.match(page, /href="\/css\/dialogs\.css\?v=1\.3\.3"/);
   assert.match(page, /src="\/brand\/PIX\.svg"/);
   assert.match(page, /id="confirmation-code"/);
   assert.match(page, /type="importmap"/);
