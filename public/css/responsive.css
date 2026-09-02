@@ -85,7 +85,6 @@
     -webkit-line-clamp: 2;
     overflow: hidden;
     line-height: 1.1;
-    min-height: calc(1.1em * 2);
   }
 
   .product-card .product-card__details-toggle {

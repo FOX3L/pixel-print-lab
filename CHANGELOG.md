@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.13.2] - 2026-09-02
+
+### Fixed
+
+- Rimosso lo spazio vuoto sotto i titoli brevi delle card catalogo desktop.
+
 ## [1.13.1] - 2026-09-02
 
 ### Fixed
